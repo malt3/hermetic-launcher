@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::io::{self, Write};
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::process;
 
@@ -110,13 +111,16 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
         fs::write(output, &data)
             .map_err(|e| format!("Failed to write output {}: {}", output, e))?;
 
-        // Make executable
-        let mut perms = fs::metadata(output)
-            .map_err(|e| format!("Failed to get metadata: {}", e))?
-            .permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(output, perms)
-            .map_err(|e| format!("Failed to set permissions: {}", e))?;
+        // Make executable (Unix only)
+        #[cfg(unix)]
+        {
+            let mut perms = fs::metadata(output)
+                .map_err(|e| format!("Failed to get metadata: {}", e))?
+                .permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(output, perms)
+                .map_err(|e| format!("Failed to set permissions: {}", e))?;
+        }
 
         eprintln!("\nFinalized stub written to: {}", output);
         eprintln!("Total arguments: {}", argv.len());
