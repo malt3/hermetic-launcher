@@ -219,10 +219,11 @@ jobs:
           cat > manifest.txt << 'EOF'
           /bin/echo /bin/echo
           EOF
-          strace -f -e trace=execve RUNFILES_MANIFEST_FILE=manifest.txt ./test-stub-x86_64 2>&1 | grep execve || true
+          echo "Filtered execve output:"
+          RUNFILES_MANIFEST_FILE=manifest.txt strace -f -e trace=execve ./test-stub-x86_64 2>&1 | grep execve || true
           echo ""
           echo "Full strace output for verification:"
-          strace -f RUNFILES_MANIFEST_FILE=manifest.txt ./test-stub-x86_64 2>&1 | head -50
+          RUNFILES_MANIFEST_FILE=manifest.txt strace -f ./test-stub-x86_64 2>&1 | head -50
 
   test-macos:
     name: Test on macOS
