@@ -43,17 +43,34 @@ pub unsafe extern "C" fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
     0
 }
 
-// Syscall wrappers
-const SYS_READ: usize = 0;
-const SYS_WRITE: usize = 1;
-const SYS_OPEN: usize = 2;
-const SYS_CLOSE: usize = 3;
-const SYS_EXECVE: usize = 59;
-const SYS_EXIT: usize = 60;
+// Syscall numbers - architecture specific
+#[cfg(target_arch = "x86_64")]
+mod syscall_numbers {
+    pub const SYS_READ: usize = 0;
+    pub const SYS_WRITE: usize = 1;
+    pub const SYS_OPEN: usize = 2;
+    pub const SYS_CLOSE: usize = 3;
+    pub const SYS_EXECVE: usize = 59;
+    pub const SYS_EXIT: usize = 60;
+}
+
+#[cfg(target_arch = "aarch64")]
+mod syscall_numbers {
+    pub const SYS_READ: usize = 63;
+    pub const SYS_WRITE: usize = 64;
+    pub const SYS_OPENAT: usize = 56;  // openat is used on aarch64
+    pub const SYS_CLOSE: usize = 57;
+    pub const SYS_EXECVE: usize = 221;
+    pub const SYS_EXIT: usize = 93;
+    pub const AT_FDCWD: i32 = -100;  // Special fd for openat to work like open
+}
+
+use syscall_numbers::*;
 
 const O_RDONLY: i32 = 0;
 const STDOUT: i32 = 1;
 
+#[cfg(target_arch = "x86_64")]
 fn exit(code: i32) -> ! {
     unsafe {
         core::arch::asm!(
@@ -65,6 +82,19 @@ fn exit(code: i32) -> ! {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+fn exit(code: i32) -> ! {
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_EXIT,
+            in("x0") code,
+            options(noreturn)
+        );
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
 fn write(fd: i32, buf: &[u8]) -> isize {
     let ret: isize;
     unsafe {
@@ -82,6 +112,23 @@ fn write(fd: i32, buf: &[u8]) -> isize {
     ret
 }
 
+#[cfg(target_arch = "aarch64")]
+fn write(fd: i32, buf: &[u8]) -> isize {
+    let ret: isize;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_WRITE,
+            in("x0") fd,
+            in("x1") buf.as_ptr(),
+            in("x2") buf.len(),
+            lateout("x0") ret,
+        );
+    }
+    ret
+}
+
+#[cfg(target_arch = "x86_64")]
 fn open(path: &[u8]) -> i32 {
     let ret: i32;
     unsafe {
@@ -99,6 +146,24 @@ fn open(path: &[u8]) -> i32 {
     ret
 }
 
+#[cfg(target_arch = "aarch64")]
+fn open(path: &[u8]) -> i32 {
+    let ret: i32;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_OPENAT,
+            in("x0") AT_FDCWD,
+            in("x1") path.as_ptr(),
+            in("x2") O_RDONLY,
+            in("x3") 0,
+            lateout("x0") ret,
+        );
+    }
+    ret
+}
+
+#[cfg(target_arch = "x86_64")]
 fn read(fd: i32, buf: &mut [u8]) -> isize {
     let ret: isize;
     unsafe {
@@ -116,6 +181,23 @@ fn read(fd: i32, buf: &mut [u8]) -> isize {
     ret
 }
 
+#[cfg(target_arch = "aarch64")]
+fn read(fd: i32, buf: &mut [u8]) -> isize {
+    let ret: isize;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_READ,
+            in("x0") fd,
+            in("x1") buf.as_ptr(),
+            in("x2") buf.len(),
+            lateout("x0") ret,
+        );
+    }
+    ret
+}
+
+#[cfg(target_arch = "x86_64")]
 fn close(fd: i32) {
     unsafe {
         core::arch::asm!(
@@ -129,6 +211,19 @@ fn close(fd: i32) {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+fn close(fd: i32) {
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_CLOSE,
+            in("x0") fd,
+            lateout("x0") _,
+        );
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
 fn execve(filename: *const u8, argv: *const *const u8, envp: *const *const u8) -> i32 {
     let ret: i32;
     unsafe {
@@ -141,6 +236,22 @@ fn execve(filename: *const u8, argv: *const *const u8, envp: *const *const u8) -
             lateout("rax") ret,
             lateout("rcx") _,
             lateout("r11") _,
+        );
+    }
+    ret
+}
+
+#[cfg(target_arch = "aarch64")]
+fn execve(filename: *const u8, argv: *const *const u8, envp: *const *const u8) -> i32 {
+    let ret: i32;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_EXECVE,
+            in("x0") filename,
+            in("x1") argv,
+            in("x2") envp,
+            lateout("x0") ret,
         );
     }
     ret

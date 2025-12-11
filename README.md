@@ -34,13 +34,33 @@ Resolves paths & executes target
 
 ## Building
 
+### Supported Architectures
+
+The stub runner supports:
+- **x86_64** (Intel/AMD 64-bit)
+- **aarch64** (ARM 64-bit)
+
+All syscalls are architecture-specific and use native calling conventions.
+
 ### Build the stub template
 
+**For x86_64:**
 ```bash
 cargo build --release
 ```
 
-This produces `target/release/runfiles-stub` - the template binary with placeholders.
+**For aarch64:**
+```bash
+# Install the target if needed
+rustup target add aarch64-unknown-linux-gnu
+
+# Build for aarch64
+cargo build --release --target aarch64-unknown-linux-gnu
+```
+
+This produces the template binary:
+- x86_64: `target/release/runfiles-stub`
+- aarch64: `target/aarch64-unknown-linux-gnu/release/runfiles-stub`
 
 ### Build the finalizer tool
 
@@ -175,10 +195,15 @@ Joins: $RUNFILES_DIR + "/" + requested_path
 ### No Stdlib Implementation
 
 The stub runner uses **direct Linux syscalls** for everything:
-- File I/O: `open`, `read`, `close` syscalls
-- Execution: `execve` syscall
-- No malloc: static buffers only
-- Custom `memcpy`/`memset` implementations
+- **File I/O**: `open`/`openat`, `read`, `close` syscalls (arch-specific)
+- **Execution**: `execve` syscall
+- **Process control**: `exit` syscall
+- **No malloc**: static buffers only
+- **Custom intrinsics**: `memcpy`/`memset`/`memcmp` implementations
+
+**Architecture-specific syscalls**:
+- **x86_64**: Uses `syscall` instruction with syscall numbers in `rax`
+- **aarch64**: Uses `svc #0` instruction with syscall numbers in `x8`, `openat` for file opening
 
 This results in a minimal binary with zero runtime dependencies.
 
@@ -206,7 +231,7 @@ $ ls -lh target/release/runfiles-stub
 ### Limitations
 
 - **Maximum 10 arguments** (argv[0] through argv[9])
-- **Linux x86_64 only** (syscalls are architecture-specific)
+- **Linux only**: Supports x86_64 and aarch64 architectures
 - **Path length limit**: 256 bytes per argument
 - **Manifest size limit**: 1024 entries, 64KB file size
 - **Environment size limit**: 16KB total, max 256 variables
@@ -320,6 +345,25 @@ This allows executed programs to:
 - Use the runfiles library themselves (via inherited RUNFILES_* variables)
 - Access PATH and other system variables
 
+## Cross-Architecture Support
+
+The stub runner uses Rust's conditional compilation (`#[cfg(target_arch = "...")]`) to provide native implementations for each architecture:
+
+### x86_64 Implementation
+- **Syscall instruction**: `syscall`
+- **Register usage**: `rax` (syscall number), `rdi`, `rsi`, `rdx` (arguments)
+- **Syscall numbers**: Standard x86_64 Linux syscall numbers
+  - `SYS_READ=0`, `SYS_WRITE=1`, `SYS_OPEN=2`, `SYS_CLOSE=3`, `SYS_EXECVE=59`, `SYS_EXIT=60`
+
+### aarch64 Implementation
+- **Syscall instruction**: `svc #0`
+- **Register usage**: `x8` (syscall number), `x0-x5` (arguments)
+- **Syscall numbers**: aarch64-specific Linux syscall numbers
+  - `SYS_READ=63`, `SYS_WRITE=64`, `SYS_OPENAT=56`, `SYS_CLOSE=57`, `SYS_EXECVE=221`, `SYS_EXIT=93`
+- **Note**: Uses `openat` with `AT_FDCWD` instead of `open` (more modern approach)
+
+The same Rust source code compiles to native binaries for both architectures with no runtime overhead.
+
 ## Design Goals
 
 1. **Minimal Size**: No unnecessary dependencies or bloat
@@ -336,8 +380,17 @@ This project demonstrates building minimal, dependency-free executables in Rust.
 
 This is a demonstration project showing:
 - How to build `no_std` Rust binaries
-- Direct Linux syscall usage
+- Direct Linux syscall usage with architecture-specific implementations
+- Cross-architecture support using Rust's conditional compilation
 - Binary template patching
 - Bazel runfiles implementation
 
 Feel free to use this as a reference for similar projects.
+
+### Adding New Architectures
+
+To add support for a new architecture:
+1. Add a new `mod syscall_numbers` block with `#[cfg(target_arch = "...")]`
+2. Implement architecture-specific inline assembly for each syscall function
+3. Update `.cargo/config.toml` with linker flags for the new target
+4. Test the build with `cargo build --release --target <triple>`
