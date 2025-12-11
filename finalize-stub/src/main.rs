@@ -99,10 +99,17 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
     // Find and replace ARG placeholders
     let arg_pattern = &[b'@'; ARG_SIZE];
 
-    for (i, arg) in argv.iter().enumerate() {
+    // Find all placeholder positions FIRST (before any replacements modify the data)
+    let mut arg_positions: Vec<usize> = Vec::new();
+    for i in 0..argv.len() {
         let arg_pos = find_nth_pattern(&data, arg_pattern, i)
             .ok_or(format!("ARG{} placeholder not found in template", i))?;
+        arg_positions.push(arg_pos);
+    }
 
+    // Now do the replacements
+    for (i, arg) in argv.iter().enumerate() {
+        let arg_pos = arg_positions[i];
         replace_at(&mut data, arg_pos, arg.as_bytes(), ARG_SIZE)?;
         eprintln!("Replaced ARG{} with: {}", i, arg);
     }
