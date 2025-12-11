@@ -1,5 +1,5 @@
 // Platform-specific implementations
-// Linux uses raw syscalls, macOS uses libc
+// Linux uses raw syscalls, macOS uses libc, Windows uses Win32 API
 
 #![no_std]
 #![no_main]
@@ -10,4 +10,8 @@ mod platform;
 
 #[cfg(target_os = "macos")]
 #[path = "macos.rs"]
+mod platform;
+
+#[cfg(target_os = "windows")]
+#[path = "windows.rs"]
 mod platform;

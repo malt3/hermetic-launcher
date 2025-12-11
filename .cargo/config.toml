@@ -9,3 +9,9 @@ rustflags = ["-C", "link-arg=-lSystem"]
 
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "link-arg=-lSystem"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = []
+
+[target.x86_64-pc-windows-gnu]
+rustflags = []
