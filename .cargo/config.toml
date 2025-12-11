@@ -3,3 +3,9 @@ rustflags = ["-C", "link-arg=-nostartfiles", "-C", "link-arg=-static", "-C", "li
 
 [target.aarch64-unknown-linux-gnu]
 rustflags = ["-C", "link-arg=-nostartfiles", "-C", "link-arg=-static", "-C", "link-arg=-no-pie", "-C", "relocation-model=static"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-lSystem"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-lSystem"]

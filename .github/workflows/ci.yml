@@ -90,7 +90,7 @@ jobs:
           retention-days: 7
 
   build-macos:
-    name: Build macOS finalizer
+    name: Build macOS binaries
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -101,21 +101,31 @@ jobs:
         with:
           targets: x86_64-apple-darwin,aarch64-apple-darwin
 
+      - name: Build template - x86_64 macOS
+        run: |
+          mkdir -p artifacts
+          cargo build --release --target x86_64-apple-darwin
+          cp target/x86_64-apple-darwin/release/runfiles-stub artifacts/runfiles-stub-x86_64-macos
+
+      - name: Build template - aarch64 macOS (Apple Silicon)
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cp target/aarch64-apple-darwin/release/runfiles-stub artifacts/runfiles-stub-aarch64-macos
+
       - name: Build finalizer - x86_64 macOS
         working-directory: finalize-stub
         run: |
           mkdir -p artifacts
           cargo build --release --target x86_64-apple-darwin
-          cp target/x86_64-apple-darwin/release/finalize-stub artifacts/finalize-stub-x86_64-macos
+          cp target/x86_64-apple-darwin/release/finalize-stub ../artifacts/finalize-stub-x86_64-macos
 
       - name: Build finalizer - aarch64 macOS (Apple Silicon)
         working-directory: finalize-stub
         run: |
           cargo build --release --target aarch64-apple-darwin
-          cp target/aarch64-apple-darwin/release/finalize-stub artifacts/finalize-stub-aarch64-macos
+          cp target/aarch64-apple-darwin/release/finalize-stub ../artifacts/finalize-stub-aarch64-macos
 
       - name: List artifacts
-        working-directory: finalize-stub
         run: |
           ls -lh artifacts/
           file artifacts/*
@@ -124,7 +134,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: binaries-macos
-          path: finalize-stub/artifacts/
+          path: artifacts/
           retention-days: 7
 
   merge-artifacts:
@@ -247,11 +257,52 @@ jobs:
         run: |
           if [ "${{ steps.arch.outputs.arch }}" = "arm64" ]; then
             chmod +x binaries/finalize-stub-aarch64-macos
+            chmod +x binaries/runfiles-stub-aarch64-macos
           else
             chmod +x binaries/finalize-stub-x86_64-macos
+            chmod +x binaries/runfiles-stub-x86_64-macos
           fi
 
-      - name: Test finalizer on x86_64 template
+      - name: Test finalizer on macOS template
+        run: |
+          if [ "${{ steps.arch.outputs.arch }}" = "arm64" ]; then
+            FINALIZER="binaries/finalize-stub-aarch64-macos"
+            TEMPLATE="binaries/runfiles-stub-aarch64-macos"
+            ARCH_NAME="aarch64"
+          else
+            FINALIZER="binaries/finalize-stub-x86_64-macos"
+            TEMPLATE="binaries/runfiles-stub-x86_64-macos"
+            ARCH_NAME="x86_64"
+          fi
+
+          echo "Testing finalizer with macOS $ARCH_NAME template..."
+          $FINALIZER \
+            --transform=0 \
+            -o test-stub-macos \
+            $TEMPLATE \
+            /bin/echo "Hello from macOS $ARCH_NAME"
+          shasum -a 256 test-stub-macos
+          echo "SHA256 (macOS stub): $(shasum -a 256 test-stub-macos | cut -d' ' -f1)"
+
+      - name: Run macOS template (native)
+        run: |
+          echo "Running native macOS stub..."
+          chmod +x test-stub-macos
+          # Create a test manifest
+          mkdir -p /tmp/runfiles
+          cp /bin/echo /tmp/runfiles/echo
+          export RUNFILES_DIR=/tmp/runfiles
+          ./test-stub-macos || echo "Exit code: $?"
+
+      - name: Verify template is actually calling echo
+        run: |
+          echo "Creating proper manifest..."
+          cat > manifest.txt << 'EOF'
+          /bin/echo /bin/echo
+          EOF
+          RUNFILES_MANIFEST_FILE=manifest.txt ./test-stub-macos
+
+      - name: Test finalizer with Linux templates (cross-platform)
         run: |
           if [ "${{ steps.arch.outputs.arch }}" = "arm64" ]; then
             FINALIZER="binaries/finalize-stub-aarch64-macos"
@@ -259,31 +310,21 @@ jobs:
             FINALIZER="binaries/finalize-stub-x86_64-macos"
           fi
 
-          echo "Testing finalizer with x86_64 template..."
+          echo "Testing finalizer with Linux x86_64 template..."
           $FINALIZER \
             --transform=0 \
-            -o test-stub-x86_64 \
+            -o test-stub-linux-x86_64 \
             binaries/runfiles-stub-x86_64-linux \
-            /bin/echo "Hello from x86_64"
-          shasum -a 256 test-stub-x86_64
-          echo "SHA256 (x86_64 stub): $(shasum -a 256 test-stub-x86_64 | cut -d' ' -f1)"
+            /bin/echo "Hello from Linux x86_64"
+          shasum -a 256 test-stub-linux-x86_64
 
-      - name: Test finalizer on aarch64 template
-        run: |
-          if [ "${{ steps.arch.outputs.arch }}" = "arm64" ]; then
-            FINALIZER="binaries/finalize-stub-aarch64-macos"
-          else
-            FINALIZER="binaries/finalize-stub-x86_64-macos"
-          fi
-
-          echo "Testing finalizer with aarch64 template..."
+          echo "Testing finalizer with Linux aarch64 template..."
           $FINALIZER \
             --transform=0 \
-            -o test-stub-aarch64 \
+            -o test-stub-linux-aarch64 \
             binaries/runfiles-stub-aarch64-linux \
-            /bin/echo "Hello from aarch64"
-          shasum -a 256 test-stub-aarch64
-          echo "SHA256 (aarch64 stub): $(shasum -a 256 test-stub-aarch64 | cut -d' ' -f1)"
+            /bin/echo "Hello from Linux aarch64"
+          shasum -a 256 test-stub-linux-aarch64
 
   test-windows:
     name: Test on Windows
