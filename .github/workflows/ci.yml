@@ -971,7 +971,8 @@ jobs:
           echo "Test 4: Runtime argument with spaces"
           RUNFILES_MANIFEST_FILE=manifest.txt ./test-runtime-args.exe "hello world" > args-test4.txt
           cat args-test4.txt
-          if grep -q "ARG0=print-args.bat" args-test4.txt && grep -q "ARG1=hello world" args-test4.txt; then
+          # Windows batch preserves quotes, so we check for either quoted or unquoted
+          if grep -q "ARG0=print-args.bat" args-test4.txt && (grep -q 'ARG1="hello world"' args-test4.txt || grep -q "ARG1=hello world" args-test4.txt); then
             echo "✓ Quoted runtime argument test passed"
           else
             echo "✗ ERROR: Quoted runtime argument not passed correctly"
