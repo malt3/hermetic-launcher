@@ -731,9 +731,35 @@ jobs:
             --transform 0 \
             --output test-stub-windows.exe \
             -- \
-            'C:\Windows\System32\cmd.exe' '/C' 'echo Hello from Windows'
+            'C:\Windows\System32\cmd.exe' '//C' 'echo Hello from Windows'
           sha256sum test-stub-windows.exe || certutil -hashfile test-stub-windows.exe SHA256
           echo "SHA256 (Windows stub): $(sha256sum test-stub-windows.exe 2>/dev/null | cut -d' ' -f1 || certutil -hashfile test-stub-windows.exe SHA256 | findstr -v 'SHA256' | findstr -v 'CertUtil')"
+
+      - name: Check DLL dependencies
+        shell: bash
+        run: |
+          echo "Checking DLL dependencies..."
+          objdump -x test-stub-windows.exe | grep "DLL Name" || true
+          ldd test-stub-windows.exe || true
+
+      - name: Run Windows template with PowerShell
+        shell: pwsh
+        run: |
+          Write-Host "Running native Windows stub with PowerShell..."
+          Write-Host "Creating manifest..."
+          @"
+          C:\Windows\System32\cmd.exe C:\Windows\System32\cmd.exe
+          "@ | Out-File -FilePath manifest.txt -Encoding ASCII
+
+          Write-Host "Setting environment and running binary..."
+          $env:RUNFILES_MANIFEST_FILE = "manifest.txt"
+          try {
+            .\test-stub-windows.exe
+            Write-Host "Success! Exit code: $LASTEXITCODE"
+          } catch {
+            Write-Host "Error: $_"
+            Write-Host "Exit code: $LASTEXITCODE"
+          }
 
       - name: Run Windows template (native)
         shell: bash
@@ -745,6 +771,10 @@ jobs:
           cat > manifest.txt << 'EOF'
           C:\Windows\System32\cmd.exe C:\Windows\System32\cmd.exe
           EOF
+          echo "Checking if binary exists and is executable..."
+          ls -lh test-stub-windows.exe
+          file test-stub-windows.exe || true
+          echo "Attempting to run binary..."
           RUNFILES_MANIFEST_FILE=manifest.txt ./test-stub-windows.exe || echo "Exit code: $?"
 
       - name: Verify template is actually calling cmd
@@ -754,7 +784,15 @@ jobs:
           cat > manifest.txt << 'EOF'
           C:\Windows\System32\cmd.exe C:\Windows\System32\cmd.exe
           EOF
-          RUNFILES_MANIFEST_FILE=manifest.txt ./test-stub-windows.exe
+          echo "Debug: Manifest contents:"
+          cat manifest.txt
+          echo ""
+          echo "Debug: Trying to run with full path..."
+          RUNFILES_MANIFEST_FILE=manifest.txt "$(pwd)/test-stub-windows.exe" || {
+            echo "Failed with exit code: $?"
+            echo "Debug: Trying with cmd.exe wrapper..."
+            cmd.exe //C "set RUNFILES_MANIFEST_FILE=manifest.txt && test-stub-windows.exe"
+          }
 
       - name: Test environment variable export (enabled)
         shell: bash
