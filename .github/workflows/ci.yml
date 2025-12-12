@@ -193,10 +193,10 @@ jobs:
         run: |
           echo "Testing finalizer with x86_64 template..."
           ./binaries/finalize-stub-x86_64-linux \
-            --transform=0 \
-            -o test-stub-x86_64 \
+            --template binaries/runfiles-stub-x86_64-linux \
+            --transform 0 \
+            --output test-stub-x86_64 \
             -- \
-            binaries/runfiles-stub-x86_64-linux \
             /bin/echo "Hello from x86_64"
           sha256sum test-stub-x86_64
           echo "SHA256 (x86_64 stub): $(sha256sum test-stub-x86_64 | cut -d' ' -f1)"
@@ -205,10 +205,10 @@ jobs:
         run: |
           echo "Testing finalizer with aarch64 template..."
           ./binaries/finalize-stub-x86_64-linux \
-            --transform=0 \
-            -o test-stub-aarch64 \
+            --template binaries/runfiles-stub-aarch64-linux \
+            --transform 0 \
+            --output test-stub-aarch64 \
             -- \
-            binaries/runfiles-stub-aarch64-linux \
             /bin/echo "Hello from aarch64"
           sha256sum test-stub-aarch64
           echo "SHA256 (aarch64 stub): $(sha256sum test-stub-aarch64 | cut -d' ' -f1)"
@@ -254,42 +254,47 @@ jobs:
 
           echo "Finalizing Linux x86_64 template..."
           ./binaries/finalize-stub-x86_64-linux \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-linux \
+            --template binaries/runfiles-stub-x86_64-linux \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-linux \
             -- \
-            binaries/runfiles-stub-x86_64-linux \
             /bin/echo "test arg"
 
           echo "Finalizing Linux aarch64 template..."
           ./binaries/finalize-stub-x86_64-linux \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-aarch64-linux \
+            --template binaries/runfiles-stub-aarch64-linux \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-aarch64-linux \
             -- \
-            binaries/runfiles-stub-aarch64-linux \
             /bin/echo "test arg"
 
           echo "Finalizing macOS x86_64 template..."
           ./binaries/finalize-stub-x86_64-linux \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-macos \
+            --template binaries/runfiles-stub-x86_64-macos \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-macos \
             -- \
-            binaries/runfiles-stub-x86_64-macos \
             /bin/echo "test arg"
 
           echo "Finalizing macOS aarch64 template..."
           ./binaries/finalize-stub-x86_64-linux \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-aarch64-macos \
+            --template binaries/runfiles-stub-aarch64-macos \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-aarch64-macos \
             -- \
-            binaries/runfiles-stub-aarch64-macos \
             /bin/echo "test arg"
 
           echo "Finalizing Windows x86_64 template..."
           ./binaries/finalize-stub-x86_64-linux \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-windows.exe \
+            --template binaries/runfiles-stub-x86_64-windows.exe \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-windows.exe \
             -- \
-            binaries/runfiles-stub-x86_64-windows.exe \
             'C:\Windows\System32\cmd.exe' "test arg"
 
           echo ""
@@ -356,10 +361,10 @@ jobs:
 
           echo "Testing finalizer with macOS $ARCH_NAME template..."
           $FINALIZER \
-            --transform=0 \
-            -o test-stub-macos \
+            --template $TEMPLATE \
+            --transform 0 \
+            --output test-stub-macos \
             -- \
-            $TEMPLATE \
             /bin/echo "Hello from macOS $ARCH_NAME"
           shasum -a 256 test-stub-macos
           echo "SHA256 (macOS stub): $(shasum -a 256 test-stub-macos | cut -d' ' -f1)"
@@ -392,19 +397,19 @@ jobs:
 
           echo "Testing finalizer with Linux x86_64 template..."
           $FINALIZER \
-            --transform=0 \
-            -o test-stub-linux-x86_64 \
+            --template binaries/runfiles-stub-x86_64-linux \
+            --transform 0 \
+            --output test-stub-linux-x86_64 \
             -- \
-            binaries/runfiles-stub-x86_64-linux \
             /bin/echo "Hello from Linux x86_64"
           shasum -a 256 test-stub-linux-x86_64
 
           echo "Testing finalizer with Linux aarch64 template..."
           $FINALIZER \
-            --transform=0 \
-            -o test-stub-linux-aarch64 \
+            --template binaries/runfiles-stub-aarch64-linux \
+            --transform 0 \
+            --output test-stub-linux-aarch64 \
             -- \
-            binaries/runfiles-stub-aarch64-linux \
             /bin/echo "Hello from Linux aarch64"
           shasum -a 256 test-stub-linux-aarch64
 
@@ -425,42 +430,47 @@ jobs:
 
           echo "Finalizing Linux x86_64 template..."
           $FINALIZER \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-linux \
+            --template binaries/runfiles-stub-x86_64-linux \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-linux \
             -- \
-            binaries/runfiles-stub-x86_64-linux \
             /bin/echo "test arg"
 
           echo "Finalizing Linux aarch64 template..."
           $FINALIZER \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-aarch64-linux \
+            --template binaries/runfiles-stub-aarch64-linux \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-aarch64-linux \
             -- \
-            binaries/runfiles-stub-aarch64-linux \
             /bin/echo "test arg"
 
           echo "Finalizing macOS x86_64 template..."
           $FINALIZER \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-macos \
+            --template binaries/runfiles-stub-x86_64-macos \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-macos \
             -- \
-            binaries/runfiles-stub-x86_64-macos \
             /bin/echo "test arg"
 
           echo "Finalizing macOS aarch64 template..."
           $FINALIZER \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-aarch64-macos \
+            --template binaries/runfiles-stub-aarch64-macos \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-aarch64-macos \
             -- \
-            binaries/runfiles-stub-aarch64-macos \
             /bin/echo "test arg"
 
           echo "Finalizing Windows x86_64 template..."
           $FINALIZER \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-windows.exe \
+            --template binaries/runfiles-stub-x86_64-windows.exe \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-windows.exe \
             -- \
-            binaries/runfiles-stub-x86_64-windows.exe \
             'C:\Windows\System32\cmd.exe' "test arg"
 
           echo ""
@@ -501,10 +511,10 @@ jobs:
         run: |
           echo "Testing finalizer with Windows x86_64 template..."
           ./binaries/finalize-stub-x86_64-windows.exe \
-            --transform=0 \
-            -o test-stub-windows.exe \
+            --template binaries/runfiles-stub-x86_64-windows.exe \
+            --transform 0 \
+            --output test-stub-windows.exe \
             -- \
-            binaries/runfiles-stub-x86_64-windows.exe \
             'C:\Windows\System32\cmd.exe' '/C' 'echo Hello from Windows'
           sha256sum test-stub-windows.exe || certutil -hashfile test-stub-windows.exe SHA256
           echo "SHA256 (Windows stub): $(sha256sum test-stub-windows.exe 2>/dev/null | cut -d' ' -f1 || certutil -hashfile test-stub-windows.exe SHA256 | findstr -v 'SHA256' | findstr -v 'CertUtil')"
@@ -546,42 +556,47 @@ jobs:
 
           echo "Finalizing Linux x86_64 template..."
           ./binaries/finalize-stub-x86_64-windows.exe \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-linux \
+            --template binaries/runfiles-stub-x86_64-linux \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-linux \
             -- \
-            binaries/runfiles-stub-x86_64-linux \
             /bin/echo "test arg"
 
           echo "Finalizing Linux aarch64 template..."
           ./binaries/finalize-stub-x86_64-windows.exe \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-aarch64-linux \
+            --template binaries/runfiles-stub-aarch64-linux \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-aarch64-linux \
             -- \
-            binaries/runfiles-stub-aarch64-linux \
             /bin/echo "test arg"
 
           echo "Finalizing macOS x86_64 template..."
           ./binaries/finalize-stub-x86_64-windows.exe \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-macos \
+            --template binaries/runfiles-stub-x86_64-macos \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-macos \
             -- \
-            binaries/runfiles-stub-x86_64-macos \
             /bin/echo "test arg"
 
           echo "Finalizing macOS aarch64 template..."
           ./binaries/finalize-stub-x86_64-windows.exe \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-aarch64-macos \
+            --template binaries/runfiles-stub-aarch64-macos \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-aarch64-macos \
             -- \
-            binaries/runfiles-stub-aarch64-macos \
             /bin/echo "test arg"
 
           echo "Finalizing Windows x86_64 template..."
           ./binaries/finalize-stub-x86_64-windows.exe \
-            --transform=0,1 \
-            -o cross-platform-test/finalized-x86_64-windows.exe \
+            --template binaries/runfiles-stub-x86_64-windows.exe \
+            --transform 0 \
+            --transform 1 \
+            --output cross-platform-test/finalized-x86_64-windows.exe \
             -- \
-            binaries/runfiles-stub-x86_64-windows.exe \
             'C:\Windows\System32\cmd.exe' "test arg"
 
           echo ""

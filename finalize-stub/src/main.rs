@@ -1,4 +1,4 @@
-use std::env;
+use clap::{ArgAction, Parser};
 use std::fs;
 use std::io::{self, Write};
 #[cfg(unix)]
@@ -7,6 +7,42 @@ use std::process;
 
 const ARG_SIZE: usize = 256;
 const ARGC_SIZE: usize = 32;
+
+/// Finalize a runfiles stub template with actual arguments
+#[derive(Parser)]
+#[command(name = "finalize-stub")]
+#[command(version, about, long_about = None)]
+#[command(after_help = "EXAMPLES:\n  \
+    # Transform only arg0:\n  \
+    finalize-stub --template template --transform 0 --output finalized -- arg0 --flag value\n\n  \
+    # Transform arg0 and arg2 (repeated flag):\n  \
+    finalize-stub --template template --transform 0 --transform 2 --output output -- arg0 arg1 arg2\n\n  \
+    # Transform arg0 and arg2 (comma-separated):\n  \
+    finalize-stub --template template --transform 0,2 --output output -- arg0 arg1 arg2\n\n  \
+    # No transforms (all arguments are literals):\n  \
+    finalize-stub --template template --output output -- /absolute/path --flag")]
+struct Cli {
+    /// Path to template runfiles-stub binary
+    #[arg(short, long, required = true)]
+    template: String,
+
+    /// Write output to file (default: stdout)
+    #[arg(short, long)]
+    output: Option<String>,
+
+    /// Argument indices to transform (0-9). Can be specified multiple times or comma-separated.
+    /// If not specified, no arguments are transformed by default.
+    #[arg(long, action = ArgAction::Append, value_delimiter = ',', value_parser = clap::value_parser!(u32).range(0..10))]
+    transform: Vec<u32>,
+
+    /// Enable verbose output
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Arguments to embed in the stub (argv[0], argv[1], ...)
+    #[arg(required = true)]
+    args: Vec<String>,
+}
 
 fn find_pattern(data: &[u8], pattern: &[u8]) -> Option<usize> {
     data.windows(pattern.len())
@@ -52,7 +88,7 @@ fn replace_at(data: &mut [u8], offset: usize, new_value: &[u8], fixed_size: usiz
     Ok(())
 }
 
-fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String], transform_flags: u32) -> Result<(), String> {
+fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String], transform_flags: u32, verbose: bool) -> Result<(), String> {
     if argv.is_empty() {
         return Err("At least one argument (argv[0]) is required".to_string());
     }
@@ -84,7 +120,9 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
     let argc_str = argv.len().to_string();
     replace_at(&mut data, argc_pos, argc_str.as_bytes(), ARGC_SIZE)?;
 
-    eprintln!("Replaced ARGC with: {}", argc_str);
+    if verbose {
+        eprintln!("Replaced ARGC with: {}", argc_str);
+    }
 
     // Find and replace TRANSFORM_FLAGS
     let flags_pattern = b"@@RUNFILES_TRANSFORM_FLAGS@@";
@@ -94,7 +132,9 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
     let flags_str = transform_flags.to_string();
     replace_at(&mut data, flags_pos, flags_str.as_bytes(), 32)?;
 
-    eprintln!("Replaced TRANSFORM_FLAGS with: {} (0b{:b})", flags_str, transform_flags);
+    if verbose {
+        eprintln!("Replaced TRANSFORM_FLAGS with: {} (0b{:b})", flags_str, transform_flags);
+    }
 
     // Find and replace ARG placeholders
     let arg_pattern = &[b'@'; ARG_SIZE];
@@ -111,7 +151,9 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
     for (i, arg) in argv.iter().enumerate() {
         let arg_pos = arg_positions[i];
         replace_at(&mut data, arg_pos, arg.as_bytes(), ARG_SIZE)?;
-        eprintln!("Replaced ARG{} with: {}", i, arg);
+        if verbose {
+            eprintln!("Replaced ARG{} with: {}", i, arg);
+        }
     }
 
     // Write output
@@ -130,8 +172,10 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
                 .map_err(|e| format!("Failed to set permissions: {}", e))?;
         }
 
-        eprintln!("\nFinalized stub written to: {}", output);
-        eprintln!("Total arguments: {}", argv.len());
+        if verbose {
+            eprintln!("\nFinalized stub written to: {}", output);
+            eprintln!("Total arguments: {}", argv.len());
+        }
     } else {
         // Write to stdout
         io::stdout().write_all(&data)
@@ -141,112 +185,31 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
     Ok(())
 }
 
-fn print_usage() {
-    eprintln!("Usage: finalize-stub [OPTIONS] <template> <arg0> [arg1 ...]");
-    eprintln!();
-    eprintln!("Options:");
-    eprintln!("  --transform=N[,N...]  Mark argument(s) N for runfiles resolution");
-    eprintln!("                        Can use comma-separated values or repeat flag");
-    eprintln!("                        If not specified, all arguments are transformed by default");
-    eprintln!("  -o <output>           Write output to file (default: stdout)");
-    eprintln!("  --                    Stop parsing flags; treat remaining args as positional");
-    eprintln!();
-    eprintln!("Arguments:");
-    eprintln!("  <template>      Path to template runfiles-stub binary");
-    eprintln!("  <arg0>          Executable path");
-    eprintln!("  [arg1...]       Additional arguments (up to 9 more)");
-    eprintln!();
-    eprintln!("Examples:");
-    eprintln!("  # Transform all arguments, write to stdout:");
-    eprintln!("  finalize-stub template _main/bin/mytool data/input.txt > output");
-    eprintln!();
-    eprintln!("  # Transform only arg0, write to file:");
-    eprintln!("  finalize-stub --transform=0 -o finalized template _main/bin/mytool --flag");
-    eprintln!();
-    eprintln!("  # Transform arg0 and arg2 (using comma-separated values):");
-    eprintln!("  finalize-stub --transform=0,2 -o output template cmd arg1 data/file");
-    eprintln!();
-    eprintln!("  # Transform arg0 and arg2 (using repeated flag):");
-    eprintln!("  finalize-stub --transform=0 --transform=2 -o output template cmd arg1 data/file");
-    eprintln!();
-    eprintln!("  # Use -- to pass arguments starting with dashes:");
-    eprintln!("  finalize-stub --transform=0 -o output template -- /bin/tool --some-flag --another");
-}
-
 fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 3 {
-        print_usage();
-        process::exit(1);
-    }
-
-    // Parse flags
-    let mut transform_indices = Vec::new();
-    let mut output_file: Option<String> = None;
-    let mut pos = 1;
-
-    while pos < args.len() {
-        if args[pos] == "--" {
-            // Stop parsing flags, everything after this is positional
-            pos += 1;
-            break;
-        } else if let Some(idx_str) = args[pos].strip_prefix("--transform=") {
-            // Support comma-separated values: --transform=0,1,2
-            for part in idx_str.split(',') {
-                match part.trim().parse::<u32>() {
-                    Ok(idx) if idx < 10 => transform_indices.push(idx),
-                    _ => {
-                        eprintln!("Error: Invalid --transform value: {}", part);
-                        eprintln!("Must be a number between 0 and 9");
-                        eprintln!("Example: --transform=0 or --transform=0,1,2");
-                        process::exit(1);
-                    }
-                }
-            }
-            pos += 1;
-        } else if args[pos] == "-o" {
-            if pos + 1 >= args.len() {
-                eprintln!("Error: -o requires an argument");
-                process::exit(1);
-            }
-            output_file = Some(args[pos + 1].clone());
-            pos += 2;
-        } else {
-            // No more flags
-            break;
-        }
-    }
-
-    // Check remaining args
-    if args.len() - pos < 2 {
-        print_usage();
-        process::exit(1);
-    }
-
-    let template = &args[pos];
-    let argv: Vec<String> = args[pos + 1..].to_vec();
+    let cli = Cli::parse();
 
     // Calculate transform flags bitmask
-    let transform_flags = if transform_indices.is_empty() {
-        // Default: transform all
-        0xFFFFFFFF
+    let transform_flags = if cli.transform.is_empty() {
+        // Default: transform none
+        0
     } else {
         // Only transform specified indices
         let mut flags = 0u32;
-        for idx in transform_indices {
+        for idx in cli.transform {
             flags |= 1 << idx;
         }
         flags
     };
 
-    match finalize_stub(template, output_file.as_deref(), &argv, transform_flags) {
+    match finalize_stub(&cli.template, cli.output.as_deref(), &cli.args, transform_flags, cli.verbose) {
         Ok(()) => {
-            if let Some(output) = output_file {
-                eprintln!("\nSuccess! Run with:");
-                eprintln!("  RUNFILES_DIR=<dir> {}", output);
-                eprintln!("  or");
-                eprintln!("  RUNFILES_MANIFEST_FILE=<file> {}", output);
+            if cli.verbose {
+                if let Some(output) = cli.output {
+                    eprintln!("\nSuccess! Run with:");
+                    eprintln!("  RUNFILES_DIR=<dir> {}", output);
+                    eprintln!("  or");
+                    eprintln!("  RUNFILES_MANIFEST_FILE=<file> {}", output);
+                }
             }
             // If writing to stdout, don't print success message (binary data was written)
         }

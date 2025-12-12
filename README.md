@@ -27,10 +27,10 @@ Create a universal binary stub that works everywhere:
 ```bash
 # Build once on any platform, works on all platforms
 ./finalize-stub \
-  --transform=0 \
-  -o my_tool \
+  --template runfiles-stub-x86_64-linux \
+  --transform 0 \
+  --output my_tool \
   -- \
-  runfiles-stub-x86_64-linux \
   my_workspace/bin/tool
 
 # Runtime: works with runfiles on any platform
@@ -68,10 +68,10 @@ chmod +x finalize-stub-x86_64-linux
 ```bash
 # Finalize a stub that wraps /bin/echo
 ./finalize-stub-x86_64-linux \
-  --transform=0 \
-  -o my_echo \
+  --template runfiles-stub-x86_64-linux \
+  --transform 0 \
+  --output my_echo \
   -- \
-  runfiles-stub-x86_64-linux \
   /bin/echo
 
 # Create a manifest
@@ -126,9 +126,9 @@ The finalizer works on any platform to create stubs for any platform:
 
 ```bash
 # On Linux, create stubs for all platforms
-./finalize-stub-x86_64-linux -o stub-linux -- runfiles-stub-x86_64-linux /bin/tool
-./finalize-stub-x86_64-linux -o stub-macos -- runfiles-stub-x86_64-macos /bin/tool
-./finalize-stub-x86_64-linux -o stub.exe -- runfiles-stub-x86_64-windows.exe 'C:\Windows\System32\cmd.exe'
+./finalize-stub-x86_64-linux --template runfiles-stub-x86_64-linux --output stub-linux -- /bin/tool
+./finalize-stub-x86_64-linux --template runfiles-stub-x86_64-macos --output stub-macos -- /bin/tool
+./finalize-stub-x86_64-linux --template runfiles-stub-x86_64-windows.exe --output stub.exe -- 'C:\Windows\System32\cmd.exe'
 
 # The finalizer just patches bytes - no platform-specific logic needed!
 ```
@@ -154,28 +154,33 @@ This is crucial for Bazel: your **exec platform** (where the build runs) can cre
 
 ```bash
 # Syntax
-finalize-stub [OPTIONS] -- <template> <arg0> [arg1 ...]
+finalize-stub --template <template> [OPTIONS] -- <arg0> [arg1 ...]
 
-# Transform all arguments (default)
-finalize-stub -o my_tool -- template my_workspace/bin/tool data/input.txt
+# No transforms (default - all arguments are literal)
+finalize-stub --template template --output my_tool -- my_workspace/bin/tool data/input.txt
 
-# Transform only specific arguments
-finalize-stub --transform=0,2 -o my_tool -- template /bin/tool --flag data/file
-#                          ^^^                                 ^^^        ^^^^
-#                      arg0 and arg2                        transform   literal   transform
+# Transform only specific arguments (repeated flags)
+finalize-stub --template template --transform 0 --transform 2 --output my_tool -- /bin/tool --flag data/file
+
+# Transform only specific arguments (comma-separated)
+finalize-stub --template template --transform 0,2 --output my_tool -- /bin/tool --flag data/file
+#                                             ^^^                       ^^^        ^^^^    ^^^
+#                                          arg0,arg2                 transform   literal transform
 ```
 
 ### Options
 
 ```
---transform=N[,N...]  Mark argument(s) N for runfiles resolution
-                      Can use comma-separated values (--transform=0,1,2)
-                      or repeat the flag (--transform=0 --transform=1)
-                      Default: transform ALL arguments
+--template <PATH>     Path to template runfiles-stub binary (required)
 
--o <output>           Output file path (default: stdout)
+--transform <N>       Mark argument N for runfiles resolution (0-9)
+                      Can be repeated for multiple arguments (--transform 0 --transform 2)
+                      or comma-separated (--transform 0,2)
+                      Default: no arguments are transformed
 
---                    Stop parsing flags; treat remaining args as positional
+--output <PATH>       Output file path (default: stdout)
+
+--                    Separates flags from positional arguments (recommended)
 ```
 
 ### Runtime Arguments
@@ -184,7 +189,7 @@ Finalized stubs forward runtime arguments to the target:
 
 ```bash
 # Create stub with embedded args
-finalize-stub --transform=0 -o stub -- template /bin/grep "pattern"
+finalize-stub --template template --transform 0 --output stub -- /bin/grep "pattern"
 
 # Run with additional args - they're forwarded as argv
 ./stub file1.txt file2.txt
@@ -277,27 +282,10 @@ Sizes vary by platform due to different linking requirements:
 
 ### 1. Tool Wrappers
 
-Create consistent wrappers for tools that need runfiles:
-
-```python
-# In your Bazel rule
-def _my_tool_impl(ctx):
-    stub = ctx.actions.declare_file(ctx.label.name)
-
-    ctx.actions.run(
-        executable = ctx.executable._finalizer,
-        arguments = [
-            "--transform=0",
-            "-o", stub.path,
-            ctx.file._template.path,
-            ctx.executable.tool.short_path,
-        ],
-        inputs = [ctx.file._template, ctx.executable.tool],
-        outputs = [stub],
-    )
-
-    return [DefaultInfo(executable = stub)]
-```
+Create consistent wrappers for tools that need runfiles.
+A good example for this is interpreted languages, where you have an interpreter binary and an entrypoint.
+Neither are good to be used as the "executable" file of a Bazel "*_binary" rule, so the runfiles-stub can be used to invoke the interpreter with a path to the script entrypoint.
+Rule syntax TBD.
 
 ### 2. Test Runners
 
@@ -305,7 +293,11 @@ Wrap test executables with their data dependencies:
 
 ```python
 # Create test runner stub
-finalize-stub --transform=0,1 -o test_runner -- template \
+finalize-stub \
+    --template template \
+    --transform 0,1 \
+    --output test_runner \
+    -- \
     my_workspace/test/runner \
     my_workspace/test/data/fixtures.json
 ```
@@ -316,7 +308,11 @@ Create tiny entry points for tools in //bin:
 
 ```python
 # Instead of a shell script, create a native stub
-finalize-stub --transform=0 -o bin/mytool -- template \
+finalize-stub \
+    --template template \
+    --transform 0 \
+    --output bin/mytool \
+    -- \
     my_workspace/tools/mytool
 ```
 
