@@ -21,6 +21,7 @@ const STD_OUTPUT_HANDLE: DWORD = 0xFFFFFFF5u32;
 const GENERIC_READ: DWORD = 0x80000000;
 const OPEN_EXISTING: DWORD = 3;
 const FILE_ATTRIBUTE_NORMAL: DWORD = 0x80;
+const INFINITE: DWORD = 0xFFFFFFFF;
 
 // STARTUPINFOA structure
 #[repr(C)]
@@ -97,6 +98,8 @@ extern "system" {
     ) -> BOOL;
     fn GetCommandLineW() -> *const u16;
     fn LocalFree(hMem: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
+    fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
+    fn GetExitCodeProcess(hProcess: HANDLE, lpExitCode: *mut DWORD) -> BOOL;
 }
 
 // External Windows API functions (shell32.dll)
@@ -427,34 +430,38 @@ const MAX_ENV_VARS: usize = 256;
 
 // External Windows API function for environment access
 extern "system" {
-    fn GetEnvironmentStringsA() -> *mut u8;
-    fn FreeEnvironmentStringsA(lpszEnvironmentBlock: *mut u8) -> BOOL;
+    fn GetEnvironmentStringsW() -> *mut u16;
+    fn FreeEnvironmentStringsW(lpszEnvironmentBlock: *mut u16) -> BOOL;
 }
 
-static mut MODIFIED_ENV_DATA: [u8; MAX_ENV_SIZE] = [0; MAX_ENV_SIZE];
+static mut MODIFIED_ENV_DATA: [u16; MAX_ENV_SIZE / 2] = [0; MAX_ENV_SIZE / 2];
 
 fn build_runfiles_environ(runfiles: Option<&Runfiles>) -> *mut core::ffi::c_void {
     unsafe {
         let mut data_pos = 0usize;
 
-        // Helper to add an environment variable
+        // Helper to add an environment variable (converts UTF-8 to UTF-16)
         let mut add_env_var = |key: &[u8], value: &[u8]| {
-            let entry_len = key.len() + 1 + value.len() + 1; // "KEY=VALUE\0"
-            if data_pos + entry_len > MAX_ENV_SIZE {
+            let total_len = key.len() + 1 + value.len() + 1; // "KEY=VALUE\0" in UTF-16
+            if data_pos + total_len > MODIFIED_ENV_DATA.len() {
                 return false;
             }
 
-            // Copy key
-            MODIFIED_ENV_DATA[data_pos..data_pos + key.len()].copy_from_slice(key);
-            data_pos += key.len();
+            // Copy key (UTF-8 to UTF-16, simple ASCII conversion)
+            for &byte in key {
+                MODIFIED_ENV_DATA[data_pos] = byte as u16;
+                data_pos += 1;
+            }
 
             // Add '='
-            MODIFIED_ENV_DATA[data_pos] = b'=';
+            MODIFIED_ENV_DATA[data_pos] = b'=' as u16;
             data_pos += 1;
 
             // Copy value
-            MODIFIED_ENV_DATA[data_pos..data_pos + value.len()].copy_from_slice(value);
-            data_pos += value.len();
+            for &byte in value {
+                MODIFIED_ENV_DATA[data_pos] = byte as u16;
+                data_pos += 1;
+            }
 
             // Null terminate
             MODIFIED_ENV_DATA[data_pos] = 0;
@@ -479,17 +486,17 @@ fn build_runfiles_environ(runfiles: Option<&Runfiles>) -> *mut core::ffi::c_void
         }
 
         // Copy existing environment, filtering out runfiles vars
-        let env_block = GetEnvironmentStringsA();
+        let env_block = GetEnvironmentStringsW();
         if !env_block.is_null() {
             let mut pos = 0;
 
-            // Environment block is a series of null-terminated strings, ending with empty string
+            // Environment block is a series of null-terminated UTF-16 strings
             loop {
                 // Find the next null terminator
                 let entry_start = pos;
                 while *env_block.add(pos) != 0 {
                     pos += 1;
-                    if pos > 32768 {  // Safety limit
+                    if pos > 16384 {  // Safety limit
                         break;
                     }
                 }
@@ -500,17 +507,52 @@ fn build_runfiles_environ(runfiles: Option<&Runfiles>) -> *mut core::ffi::c_void
                     break;
                 }
 
-                let entry = core::slice::from_raw_parts(env_block.add(entry_start), entry_len);
-
-                // Check if this is a runfiles variable we should skip
-                let should_skip = str_starts_with(entry, b"RUNFILES_MANIFEST_FILE=")
-                    || str_starts_with(entry, b"RUNFILES_DIR=")
-                    || str_starts_with(entry, b"JAVA_RUNFILES=");
+                // Check if this is a runfiles variable we should skip (compare in UTF-16)
+                let entry_ptr = env_block.add(entry_start);
+                let should_skip =
+                    // Check for RUNFILES_MANIFEST_FILE=
+                    (entry_len > 23 && {
+                        let prefix = b"RUNFILES_MANIFEST_FILE=";
+                        let mut matches = true;
+                        for i in 0..23 {
+                            if *entry_ptr.add(i) != prefix[i] as u16 {
+                                matches = false;
+                                break;
+                            }
+                        }
+                        matches
+                    }) ||
+                    // Check for RUNFILES_DIR=
+                    (entry_len > 13 && {
+                        let prefix = b"RUNFILES_DIR=";
+                        let mut matches = true;
+                        for i in 0..13 {
+                            if *entry_ptr.add(i) != prefix[i] as u16 {
+                                matches = false;
+                                break;
+                            }
+                        }
+                        matches
+                    }) ||
+                    // Check for JAVA_RUNFILES=
+                    (entry_len > 14 && {
+                        let prefix = b"JAVA_RUNFILES=";
+                        let mut matches = true;
+                        for i in 0..14 {
+                            if *entry_ptr.add(i) != prefix[i] as u16 {
+                                matches = false;
+                                break;
+                            }
+                        }
+                        matches
+                    });
 
                 if !should_skip {
                     // Copy this environment variable
-                    if data_pos + entry_len + 1 <= MAX_ENV_SIZE {
-                        MODIFIED_ENV_DATA[data_pos..data_pos + entry_len].copy_from_slice(entry);
+                    if data_pos + entry_len + 1 <= MODIFIED_ENV_DATA.len() {
+                        for i in 0..entry_len {
+                            MODIFIED_ENV_DATA[data_pos + i] = *entry_ptr.add(i);
+                        }
                         MODIFIED_ENV_DATA[data_pos + entry_len] = 0;
                         data_pos += entry_len + 1;
                     }
@@ -519,14 +561,12 @@ fn build_runfiles_environ(runfiles: Option<&Runfiles>) -> *mut core::ffi::c_void
                 pos += 1; // Skip past the null terminator
             }
 
-            FreeEnvironmentStringsA(env_block);
+            FreeEnvironmentStringsW(env_block);
         }
 
-        // Add final double null terminator to mark end of environment block
-        // Windows requires two null bytes: one to end the last variable, one to end the block
-        if data_pos + 1 < MAX_ENV_SIZE {
+        // Add final null terminator to mark end of environment block
+        if data_pos < MODIFIED_ENV_DATA.len() {
             MODIFIED_ENV_DATA[data_pos] = 0;
-            MODIFIED_ENV_DATA[data_pos + 1] = 0;
         }
 
         MODIFIED_ENV_DATA.as_mut_ptr() as *mut core::ffi::c_void
@@ -941,7 +981,14 @@ pub extern "C" fn main() -> ! {
             ExitProcess(1);
         }
 
-        // Close handles (we don't need them)
+        // Wait for the child process to complete
+        WaitForSingleObject(pi.hProcess, INFINITE);
+
+        // Get the child process's exit code
+        let mut exit_code: DWORD = 0;
+        GetExitCodeProcess(pi.hProcess, &mut exit_code);
+
+        // Close handles
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
 
@@ -950,7 +997,7 @@ pub extern "C" fn main() -> ! {
             LocalFree(runtime_argv_wide as *mut core::ffi::c_void);
         }
 
-        // Exit successfully - the child process is now running
-        ExitProcess(0);
+        // Exit with the child process's exit code
+        ExitProcess(exit_code);
     }
 }
