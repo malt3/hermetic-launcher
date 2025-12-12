@@ -22,6 +22,7 @@ const GENERIC_READ: DWORD = 0x80000000;
 const OPEN_EXISTING: DWORD = 3;
 const FILE_ATTRIBUTE_NORMAL: DWORD = 0x80;
 const INFINITE: DWORD = 0xFFFFFFFF;
+const CREATE_UNICODE_ENVIRONMENT: DWORD = 0x00000400;
 
 // STARTUPINFOW structure (wide char version for CreateProcessW)
 #[repr(C)]
@@ -97,16 +98,13 @@ extern "system" {
         lpProcessInformation: *mut PROCESS_INFORMATION,
     ) -> BOOL;
     fn GetCommandLineW() -> *const u16;
-    fn LocalFree(hMem: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
     fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
     fn GetExitCodeProcess(hProcess: HANDLE, lpExitCode: *mut DWORD) -> BOOL;
+    fn GetLastError() -> DWORD;
 }
 
-// External Windows API functions (shell32.dll)
-#[link(name = "shell32")]
-extern "system" {
-    fn CommandLineToArgvW(lpCmdLine: *const u16, pNumArgs: *mut i32) -> *mut *mut u16;
-}
+// We don't use CommandLineToArgvW to avoid shell32.dll dependency
+// Instead we parse runtime args ourselves if needed
 
 // String utilities
 fn print(s: &[u8]) {
@@ -682,24 +680,12 @@ fn is_template_placeholder(placeholder: &[u8]) -> bool {
 #[no_mangle]
 pub extern "C" fn main() -> ! {
     unsafe {
-        // Parse runtime arguments from command line (keep as UTF-16)
+        // Get command line for executable path extraction only
         let cmdline = GetCommandLineW();
-        let mut runtime_argc: i32 = 0;
-        let runtime_argv_wide = CommandLineToArgvW(cmdline, &mut runtime_argc);
 
-        // Store pointers to runtime args (skip argv[0])
-        let mut runtime_args: [*const u16; 128] = [core::ptr::null(); 128];
-        let mut runtime_args_count = 0usize;
-
-        if !runtime_argv_wide.is_null() && runtime_argc > 1 {
-            for i in 1..runtime_argc as usize {
-                if runtime_args_count >= 128 {
-                    break;
-                }
-                runtime_args[runtime_args_count] = *runtime_argv_wide.add(i);
-                runtime_args_count += 1;
-            }
-        }
+        // Runtime arguments are not supported to avoid shell32.dll dependency
+        // The stub only uses embedded arguments
+        let runtime_args_count = 0usize;
 
         // Check if ARGC is still a placeholder
         if is_template_placeholder(&ARGC_PLACEHOLDER) {
@@ -775,30 +761,47 @@ pub extern "C" fn main() -> ! {
         let needs_transform = (transform_flags & argc_mask) != 0;
         let needs_runfiles = needs_transform || export_runfiles_env;
 
-        // Get executable path from runtime argv[0] for runfiles fallback
-        // Convert from UTF-16 to UTF-8/ASCII (simple conversion, assumes ASCII path)
+        // Parse argv[0] from command line manually
+        // Command line format: either "path\to\exe" args... or path\to\exe args...
+        // We extract the first token (argv[0]) for runfiles fallback
         let mut exe_path_buf = [0u8; MAX_PATH_LEN];
-        let executable_path = if !runtime_argv_wide.is_null() && runtime_argc > 0 {
-            let argv0_wide = *runtime_argv_wide;
-            if !argv0_wide.is_null() {
-                let mut exe_len = 0;
-                while exe_len < MAX_PATH_LEN {
-                    let wchar = *argv0_wide.add(exe_len);
-                    if wchar == 0 {
-                        break;
-                    }
-                    // Simple conversion: just take low byte (works for ASCII paths)
-                    exe_path_buf[exe_len] = (wchar & 0xFF) as u8;
-                    exe_len += 1;
-                }
-                if exe_len > 0 {
-                    Some(&exe_path_buf[..exe_len] as &[u8])
-                } else {
-                    None
+        let mut exe_len = 0;
+        let mut pos = 0usize;
+
+        // Skip leading whitespace
+        while *cmdline.add(pos) != 0 && (*cmdline.add(pos) == b' ' as u16 || *cmdline.add(pos) == b'\t' as u16) {
+            pos += 1;
+        }
+
+        // Check if first char is a quote
+        let quoted = *cmdline.add(pos) == b'"' as u16;
+        if quoted {
+            pos += 1; // Skip opening quote
+        }
+
+        // Extract argv[0]
+        while exe_len < MAX_PATH_LEN && *cmdline.add(pos) != 0 {
+            let wchar = *cmdline.add(pos);
+
+            // Check for end of argv[0]
+            if quoted {
+                if wchar == b'"' as u16 {
+                    break; // End of quoted string
                 }
             } else {
-                None
+                if wchar == b' ' as u16 || wchar == b'\t' as u16 {
+                    break; // End of unquoted string
+                }
             }
+
+            // Simple UTF-16 to ASCII conversion
+            exe_path_buf[exe_len] = (wchar & 0xFF) as u8;
+            exe_len += 1;
+            pos += 1;
+        }
+
+        let executable_path = if exe_len > 0 {
+            Some(&exe_path_buf[..exe_len] as &[u8])
         } else {
             None
         };
@@ -909,43 +912,7 @@ pub extern "C" fn main() -> ! {
             }
         }
 
-        // Add runtime arguments (already UTF-16, just copy)
-        for i in 0..runtime_args_count {
-            let runtime_arg = runtime_args[i];
-            let arg_len = wstrlen(runtime_arg);
-
-            // Check if we need quotes
-            let mut needs_quotes = false;
-            for j in 0..arg_len {
-                if *runtime_arg.add(j) == b' ' as u16 {
-                    needs_quotes = true;
-                    break;
-                }
-            }
-
-            if needs_quotes && cmdline_pos < cmdline_wide.len() {
-                cmdline_wide[cmdline_pos] = b'"' as u16;
-                cmdline_pos += 1;
-            }
-
-            // Copy wide string
-            let copy_len = arg_len.min(cmdline_wide.len() - cmdline_pos);
-            for j in 0..copy_len {
-                cmdline_wide[cmdline_pos + j] = *runtime_arg.add(j);
-            }
-            cmdline_pos += copy_len;
-
-            if needs_quotes && cmdline_pos < cmdline_wide.len() {
-                cmdline_wide[cmdline_pos] = b'"' as u16;
-                cmdline_pos += 1;
-            }
-
-            // Add space between arguments (except after last)
-            if i < runtime_args_count - 1 && cmdline_pos < cmdline_wide.len() {
-                cmdline_wide[cmdline_pos] = b' ' as u16;
-                cmdline_pos += 1;
-            }
-        }
+        // Runtime arguments are not supported (no shell32.dll dependency)
 
         // Null-terminate command line
         if cmdline_pos < cmdline_wide.len() {
@@ -964,6 +931,14 @@ pub extern "C" fn main() -> ! {
         si.cb = core::mem::size_of::<STARTUPINFOW>() as DWORD;
         let mut pi: PROCESS_INFORMATION = core::mem::zeroed();
 
+        // Determine creation flags
+        // If we have a UTF-16 environment block, we need CREATE_UNICODE_ENVIRONMENT
+        let creation_flags = if export_runfiles_env {
+            CREATE_UNICODE_ENVIRONMENT
+        } else {
+            0
+        };
+
         // Pass NULL for lpApplicationName and put everything in lpCommandLine
         // This is the recommended approach for CreateProcessW
         let success = CreateProcessW(
@@ -972,7 +947,7 @@ pub extern "C" fn main() -> ! {
             core::ptr::null_mut(),      // Process attributes
             core::ptr::null_mut(),      // Thread attributes
             1,                          // Inherit handles
-            0,                          // Creation flags
+            creation_flags,             // Creation flags (with CREATE_UNICODE_ENVIRONMENT if needed)
             envp,                       // Environment
             core::ptr::null(),          // Current directory
             &mut si,
@@ -994,11 +969,6 @@ pub extern "C" fn main() -> ! {
         // Close handles
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
-
-        // Free the argv array allocated by CommandLineToArgvW
-        if !runtime_argv_wide.is_null() {
-            LocalFree(runtime_argv_wide as *mut core::ffi::c_void);
-        }
 
         // Exit with the child process's exit code
         ExitProcess(exit_code);
