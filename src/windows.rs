@@ -304,7 +304,7 @@ struct Runfiles {
 }
 
 impl Runfiles {
-    fn create() -> Option<Self> {
+    fn create(executable_path: Option<&[u8]>) -> Option<Self> {
         let mut manifest_path = [0u8; MAX_PATH_LEN];
 
         // Try RUNFILES_MANIFEST_FILE first
@@ -325,6 +325,43 @@ impl Runfiles {
                 return Some(Self {
                     mode: RunfilesMode::DirectoryBased(runfiles_dir, len),
                 });
+            }
+        }
+
+        // Try to infer runfiles directory from executable path
+        // Pattern: <executable_path>.runfiles\
+        if let Some(exe_path) = executable_path {
+            let exe_len = strlen(exe_path);
+            if exe_len > 0 && exe_len + 10 < MAX_PATH_LEN {  // +10 for ".runfiles\0"
+                let mut runfiles_dir = [0u8; MAX_PATH_LEN];
+
+                // Copy executable path
+                runfiles_dir[..exe_len].copy_from_slice(&exe_path[..exe_len]);
+
+                // Append ".runfiles"
+                runfiles_dir[exe_len..exe_len + 9].copy_from_slice(b".runfiles");
+                runfiles_dir[exe_len + 9] = 0; // null terminator
+
+                // Check if directory exists by trying to open it
+                unsafe {
+                    const FILE_FLAG_BACKUP_SEMANTICS: DWORD = 0x02000000;  // Needed to open directories
+                    let handle = CreateFileA(
+                        runfiles_dir.as_ptr(),
+                        GENERIC_READ,
+                        0,
+                        core::ptr::null_mut(),
+                        OPEN_EXISTING,
+                        FILE_FLAG_BACKUP_SEMANTICS,
+                        core::ptr::null_mut(),
+                    );
+                    if handle != INVALID_HANDLE_VALUE {
+                        CloseHandle(handle);
+                        // Remove null terminator for internal storage
+                        return Some(Self {
+                            mode: RunfilesMode::DirectoryBased(runfiles_dir, exe_len + 9),
+                        });
+                    }
+                }
             }
         }
 
@@ -556,13 +593,41 @@ pub extern "C" fn main() -> ! {
         };
         let needs_runfiles = (transform_flags & argc_mask) != 0;
 
+        // Get executable path from runtime argv[0] for runfiles fallback
+        // Convert from UTF-16 to UTF-8/ASCII (simple conversion, assumes ASCII path)
+        let mut exe_path_buf = [0u8; MAX_PATH_LEN];
+        let executable_path = if !runtime_argv_wide.is_null() && runtime_argc > 0 {
+            let argv0_wide = *runtime_argv_wide;
+            if !argv0_wide.is_null() {
+                let mut exe_len = 0;
+                while exe_len < MAX_PATH_LEN {
+                    let wchar = *argv0_wide.add(exe_len);
+                    if wchar == 0 {
+                        break;
+                    }
+                    // Simple conversion: just take low byte (works for ASCII paths)
+                    exe_path_buf[exe_len] = (wchar & 0xFF) as u8;
+                    exe_len += 1;
+                }
+                if exe_len > 0 {
+                    Some(&exe_path_buf[..exe_len] as &[u8])
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Initialize runfiles only if needed
         let runfiles = if needs_runfiles {
-            if let Some(rf) = Runfiles::create() {
+            if let Some(rf) = Runfiles::create(executable_path) {
                 Some(rf)
             } else {
                 print(b"ERROR: Failed to initialize runfiles\r\n");
-                print(b"Set RUNFILES_DIR or RUNFILES_MANIFEST_FILE\r\n");
+                print(b"Set RUNFILES_DIR or RUNFILES_MANIFEST_FILE, or ensure <executable>.runfiles\\ directory exists\r\n");
                 ExitProcess(1);
             }
         } else {

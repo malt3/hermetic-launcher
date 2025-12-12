@@ -211,7 +211,7 @@ struct Runfiles {
 }
 
 impl Runfiles {
-    fn create() -> Option<Self> {
+    fn create(executable_path: Option<&[u8]>) -> Option<Self> {
         let mut manifest_path = [0u8; MAX_PATH_LEN];
 
         // Try RUNFILES_MANIFEST_FILE first
@@ -235,6 +235,35 @@ impl Runfiles {
                 return Some(Self {
                     mode: RunfilesMode::DirectoryBased(runfiles_dir, len),
                 });
+            }
+        }
+
+        // Try to infer runfiles directory from executable path
+        // Pattern: <executable_path>.runfiles/
+        if let Some(exe_path) = executable_path {
+            let exe_len = strlen(exe_path);
+            if exe_len > 0 && exe_len + 10 < MAX_PATH_LEN {  // +10 for ".runfiles\0"
+                let mut runfiles_dir = [0u8; MAX_PATH_LEN];
+
+                // Copy executable path
+                runfiles_dir[..exe_len].copy_from_slice(&exe_path[..exe_len]);
+
+                // Append ".runfiles"
+                runfiles_dir[exe_len..exe_len + 9].copy_from_slice(b".runfiles");
+                runfiles_dir[exe_len + 9] = 0; // null terminator
+
+                // Check if directory exists by trying to open it
+                unsafe {
+                    const O_RDONLY: i32 = 0;
+                    let fd = open(runfiles_dir.as_ptr(), O_RDONLY);
+                    if fd >= 0 {
+                        close(fd);
+                        // Remove null terminator for internal storage
+                        return Some(Self {
+                            mode: RunfilesMode::DirectoryBased(runfiles_dir, exe_len + 9),
+                        });
+                    }
+                }
             }
         }
 
@@ -416,13 +445,26 @@ pub extern "C" fn main(runtime_argc: i32, runtime_argv: *const *const u8) -> ! {
         };
         let needs_runfiles = (transform_flags & argc_mask) != 0;
 
+        // Get executable path from runtime argv[0] for runfiles fallback
+        let executable_path = if runtime_argc > 0 {
+            let argv0_ptr = *runtime_argv;
+            let exe_len = strlen(core::slice::from_raw_parts(argv0_ptr, MAX_PATH_LEN));
+            if exe_len > 0 {
+                Some(core::slice::from_raw_parts(argv0_ptr, exe_len))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Initialize runfiles only if needed
         let runfiles = if needs_runfiles {
-            if let Some(rf) = Runfiles::create() {
+            if let Some(rf) = Runfiles::create(executable_path) {
                 Some(rf)
             } else {
                 print(b"ERROR: Failed to initialize runfiles\n");
-                print(b"Set RUNFILES_DIR or RUNFILES_MANIFEST_FILE\n");
+                print(b"Set RUNFILES_DIR or RUNFILES_MANIFEST_FILE, or ensure <executable>.runfiles/ directory exists\n");
                 exit(1);
             }
         } else {

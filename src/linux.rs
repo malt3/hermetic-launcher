@@ -438,7 +438,7 @@ struct Runfiles {
 }
 
 impl Runfiles {
-    fn create() -> Option<Self> {
+    fn create(executable_path: Option<&[u8]>) -> Option<Self> {
         let mut manifest_path = [0u8; MAX_PATH_LEN];
 
         // Try RUNFILES_MANIFEST_FILE first
@@ -462,6 +462,32 @@ impl Runfiles {
                 return Some(Self {
                     mode: RunfilesMode::DirectoryBased(runfiles_dir, len),
                 });
+            }
+        }
+
+        // Try to infer runfiles directory from executable path
+        // Pattern: <executable_path>.runfiles/
+        if let Some(exe_path) = executable_path {
+            let exe_len = strlen(exe_path);
+            if exe_len > 0 && exe_len + 10 < MAX_PATH_LEN {  // +10 for ".runfiles\0"
+                let mut runfiles_dir = [0u8; MAX_PATH_LEN];
+
+                // Copy executable path
+                runfiles_dir[..exe_len].copy_from_slice(&exe_path[..exe_len]);
+
+                // Append ".runfiles"
+                runfiles_dir[exe_len..exe_len + 9].copy_from_slice(b".runfiles");
+                runfiles_dir[exe_len + 9] = 0; // null terminator
+
+                // Check if directory exists by trying to open it
+                let fd = open(&runfiles_dir[..exe_len + 10]);
+                if fd >= 0 {
+                    close(fd);
+                    // Remove null terminator for internal storage
+                    return Some(Self {
+                        mode: RunfilesMode::DirectoryBased(runfiles_dir, exe_len + 9),
+                    });
+                }
             }
         }
 
@@ -636,35 +662,28 @@ fn get_environ() -> *const *const u8 {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+core::arch::global_asm!(
+    ".global _start",
+    "_start:",
+    "mov rdi, rsp",                 // Pass stack pointer as first argument
+    "call _start_rust",             // Call the actual start function
+);
+
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    ".global _start",
+    "_start:",
+    "mov x0, sp",                   // Pass stack pointer as first argument
+    "b _start_rust",                // Jump to the actual start function
+);
+
 #[no_mangle]
-pub extern "C" fn _start() -> ! {
+pub extern "C" fn _start_rust(initial_sp: *const usize) -> ! {
     unsafe {
-        // Read runtime argc/argv from stack before any stack operations
-        // Stack layout on entry: [rsp/sp] = argc, [rsp/sp + 8] = argv[0], [rsp/sp + 16] = argv[1], ...
-        let runtime_argc: usize;
-        let runtime_argv: *const *const u8;
-
-        #[cfg(target_arch = "x86_64")]
-        {
-            core::arch::asm!(
-                "mov {argc}, [rsp]",           // Load argc from stack
-                "lea {argv}, [rsp + 8]",       // Load address of argv[0]
-                argc = out(reg) runtime_argc,
-                argv = out(reg) runtime_argv,
-                options(nostack)
-            );
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            core::arch::asm!(
-                "ldr {argc}, [sp]",            // Load argc from stack
-                "add {argv}, sp, #8",          // Load address of argv[0]
-                argc = out(reg) runtime_argc,
-                argv = out(reg) runtime_argv,
-                options(nostack)
-            );
-        }
+        // Stack layout: [sp] = argc, [sp + 8] = argv[0], [sp + 16] = argv[1], ...
+        let runtime_argc = *initial_sp;
+        let runtime_argv = (initial_sp as usize + 8) as *const *const u8;
 
         // Check if ARGC is still a placeholder
         if is_template_placeholder(&ARGC_PLACEHOLDER) {
@@ -730,13 +749,29 @@ pub extern "C" fn _start() -> ! {
         };
         let needs_runfiles = (transform_flags & argc_mask) != 0;
 
+        // Get executable path from runtime argv[0] (the stub's actual path) for runfiles fallback
+        let executable_path = if runtime_argc > 0 {
+            let argv0_ptr = *runtime_argv;
+            let mut exe_len = 0;
+            while *argv0_ptr.add(exe_len) != 0 && exe_len < MAX_PATH_LEN {
+                exe_len += 1;
+            }
+            if exe_len > 0 {
+                Some(core::slice::from_raw_parts(argv0_ptr, exe_len))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Initialize runfiles only if needed
         let runfiles = if needs_runfiles {
-            if let Some(rf) = Runfiles::create() {
+            if let Some(rf) = Runfiles::create(executable_path) {
                 Some(rf)
             } else {
                 print(b"ERROR: Failed to initialize runfiles\n");
-                print(b"Set RUNFILES_DIR or RUNFILES_MANIFEST_FILE\n");
+                print(b"Set RUNFILES_DIR or RUNFILES_MANIFEST_FILE, or ensure <executable>.runfiles/ directory exists\n");
                 exit(1);
             }
         } else {
