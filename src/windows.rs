@@ -23,13 +23,13 @@ const OPEN_EXISTING: DWORD = 3;
 const FILE_ATTRIBUTE_NORMAL: DWORD = 0x80;
 const INFINITE: DWORD = 0xFFFFFFFF;
 
-// STARTUPINFOA structure
+// STARTUPINFOW structure (wide char version for CreateProcessW)
 #[repr(C)]
-struct STARTUPINFOA {
+struct STARTUPINFOW {
     cb: DWORD,
-    lpReserved: LPSTR,
-    lpDesktop: LPSTR,
-    lpTitle: LPSTR,
+    lpReserved: *mut u16,
+    lpDesktop: *mut u16,
+    lpTitle: *mut u16,
     dwX: DWORD,
     dwY: DWORD,
     dwXSize: DWORD,
@@ -93,7 +93,7 @@ extern "system" {
         dwCreationFlags: DWORD,
         lpEnvironment: LPVOID,
         lpCurrentDirectory: *const u16,
-        lpStartupInfo: *mut STARTUPINFOA,
+        lpStartupInfo: *mut STARTUPINFOW,
         lpProcessInformation: *mut PROCESS_INFORMATION,
     ) -> BOOL;
     fn GetCommandLineW() -> *const u16;
@@ -285,7 +285,13 @@ fn load_manifest(path: &[u8]) -> Option<Manifest> {
 
             if let Some(space_pos) = find_byte(line, b' ') {
                 let key = &line[..space_pos];
-                let value = &line[space_pos + 1..];
+                let mut value = &line[space_pos + 1..];
+
+                // Strip trailing \r if present (Windows line endings)
+                if value.len() > 0 && value[value.len() - 1] == b'\r' {
+                    value = &value[..value.len() - 1];
+                }
+
                 manifest.add_entry(key, value);
             }
 
@@ -946,11 +952,6 @@ pub extern "C" fn main() -> ! {
             cmdline_wide[cmdline_pos] = 0;
         }
 
-        // Convert first argument (executable path) to UTF-16 for CreateProcessW
-        let mut exe_path_wide = [0u16; MAX_PATH_LEN];
-        let exe_len = strlen(&resolved_paths[0]);
-        utf8_to_wide(&resolved_paths[0][..exe_len], &mut exe_path_wide);
-
         // Build environment with runfiles variables if export is enabled
         let envp = if export_runfiles_env {
             build_runfiles_environ(runfiles.as_ref())
@@ -959,13 +960,15 @@ pub extern "C" fn main() -> ! {
         };
 
         // Create the process
-        let mut si: STARTUPINFOA = core::mem::zeroed();
-        si.cb = core::mem::size_of::<STARTUPINFOA>() as DWORD;
+        let mut si: STARTUPINFOW = core::mem::zeroed();
+        si.cb = core::mem::size_of::<STARTUPINFOW>() as DWORD;
         let mut pi: PROCESS_INFORMATION = core::mem::zeroed();
 
+        // Pass NULL for lpApplicationName and put everything in lpCommandLine
+        // This is the recommended approach for CreateProcessW
         let success = CreateProcessW(
-            exe_path_wide.as_ptr(),     // Application name (UTF-16)
-            cmdline_wide.as_mut_ptr(),  // Command line (UTF-16)
+            core::ptr::null(),          // Application name (NULL - use command line)
+            cmdline_wide.as_mut_ptr(),  // Command line (UTF-16) - includes argv[0]
             core::ptr::null_mut(),      // Process attributes
             core::ptr::null_mut(),      // Thread attributes
             1,                          // Inherit handles

@@ -731,7 +731,7 @@ jobs:
             --transform 0 \
             --output test-stub-windows.exe \
             -- \
-            'C:\Windows\System32\cmd.exe' '/C' 'echo Hello from Windows'
+            'C:\Windows\System32\cmd.exe' '//C' 'echo Hello from Windows'
           sha256sum test-stub-windows.exe || certutil -hashfile test-stub-windows.exe SHA256
           echo "SHA256 (Windows stub): $(sha256sum test-stub-windows.exe 2>/dev/null | cut -d' ' -f1 || certutil -hashfile test-stub-windows.exe SHA256 | findstr -v 'SHA256' | findstr -v 'CertUtil')"
 
