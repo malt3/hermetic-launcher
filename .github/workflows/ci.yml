@@ -735,6 +735,32 @@ jobs:
           sha256sum test-stub-windows.exe || certutil -hashfile test-stub-windows.exe SHA256
           echo "SHA256 (Windows stub): $(sha256sum test-stub-windows.exe 2>/dev/null | cut -d' ' -f1 || certutil -hashfile test-stub-windows.exe SHA256 | findstr -v 'SHA256' | findstr -v 'CertUtil')"
 
+      - name: Check DLL dependencies
+        shell: bash
+        run: |
+          echo "Checking DLL dependencies..."
+          objdump -x test-stub-windows.exe | grep "DLL Name" || true
+          ldd test-stub-windows.exe || true
+
+      - name: Run Windows template with PowerShell
+        shell: pwsh
+        run: |
+          Write-Host "Running native Windows stub with PowerShell..."
+          Write-Host "Creating manifest..."
+          @"
+          C:\Windows\System32\cmd.exe C:\Windows\System32\cmd.exe
+          "@ | Out-File -FilePath manifest.txt -Encoding ASCII
+
+          Write-Host "Setting environment and running binary..."
+          $env:RUNFILES_MANIFEST_FILE = "manifest.txt"
+          try {
+            .\test-stub-windows.exe
+            Write-Host "Success! Exit code: $LASTEXITCODE"
+          } catch {
+            Write-Host "Error: $_"
+            Write-Host "Exit code: $LASTEXITCODE"
+          }
+
       - name: Run Windows template (native)
         shell: bash
         run: |
