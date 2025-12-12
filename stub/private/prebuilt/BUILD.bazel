@@ -1,0 +1,204 @@
+load("//stub/private:stub_template_toolchain.bzl", "stub_template_toolchain")
+load("//stub/private:stub_finalizer_toolchain.bzl", "stub_finalizer_toolchain")
+
+package(default_visibility = ["//visibility:public"])
+
+stub_template_toolchain(
+    name = "template_aarch64_linux",
+    template_exe = "@runfiles_stub_aarch64_linux//file",
+)
+
+toolchain(
+    name = "template_aarch64_linux_toolchain",
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":template_aarch64_linux",
+    toolchain_type = "//stub:template_toolchain_type",
+)
+
+toolchain(
+    name = "template_aarch64_linux_exec_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":template_aarch64_linux",
+    toolchain_type = "//stub:template_exec_toolchain_type",
+)
+
+stub_template_toolchain(
+    name = "template_aarch64_macos",
+    template_exe = "@runfiles_stub_aarch64_macos//file",
+)
+
+toolchain(
+    name = "template_aarch64_macos_toolchain",
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:macos",
+    ],
+    toolchain = ":template_aarch64_macos",
+    toolchain_type = "//stub:template_toolchain_type",
+)
+
+toolchain(
+    name = "template_aarch64_macos_exec_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:macos",
+    ],
+    toolchain = ":template_aarch64_macos",
+    toolchain_type = "//stub:template_exec_toolchain_type",
+)
+
+stub_template_toolchain(
+    name = "template_x86_64_linux",
+    template_exe = "@runfiles_stub_x86_64_linux//file",
+)
+
+toolchain(
+    name = "template_x86_64_linux_toolchain",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":template_x86_64_linux",
+    toolchain_type = "//stub:template_toolchain_type",
+)
+
+toolchain(
+    name = "template_x86_64_linux_exec_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":template_x86_64_linux",
+    toolchain_type = "//stub:template_exec_toolchain_type",
+)
+
+stub_template_toolchain(
+    name = "template_x86_64_macos",
+    template_exe = "@runfiles_stub_x86_64_macos//file",
+)
+
+toolchain(
+    name = "template_x86_64_macos_toolchain",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+    toolchain = ":template_x86_64_macos",
+    toolchain_type = "//stub:template_toolchain_type",
+)
+
+toolchain(
+    name = "template_x86_64_macos_exec_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+    toolchain = ":template_x86_64_macos",
+    toolchain_type = "//stub:template_exec_toolchain_type",
+)
+
+stub_template_toolchain(
+    name = "template_x86_64_windows",
+    template_exe = "@runfiles_stub_x86_64_windows//file",
+)
+
+toolchain(
+    name = "template_x86_64_windows_toolchain",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    toolchain = ":template_x86_64_windows",
+    toolchain_type = "//stub:template_toolchain_type",
+)
+
+toolchain(
+    name = "template_x86_64_windows_exec_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    toolchain = ":template_x86_64_windows",
+    toolchain_type = "//stub:template_exec_toolchain_type",
+)
+
+stub_finalizer_toolchain(
+    name = "finalizer_aarch64_linux",
+    finalizer = "@finalize_stub_aarch64_linux//file",
+)
+
+toolchain(
+    name = "finalizer_aarch64_linux_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":finalizer_aarch64_linux",
+    toolchain_type = "//stub:finalizer_toolchain_type",
+)
+
+stub_finalizer_toolchain(
+    name = "finalizer_aarch64_macos",
+    finalizer = "@finalize_stub_aarch64_macos//file",
+)
+
+toolchain(
+    name = "finalizer_aarch64_macos_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:macos",
+    ],
+    toolchain = ":finalizer_aarch64_macos",
+    toolchain_type = "//stub:finalizer_toolchain_type",
+)
+
+stub_finalizer_toolchain(
+    name = "finalizer_x86_64_linux",
+    finalizer = "@finalize_stub_x86_64_linux//file",
+)
+
+toolchain(
+    name = "finalizer_x86_64_linux_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":finalizer_x86_64_linux",
+    toolchain_type = "//stub:finalizer_toolchain_type",
+)
+
+stub_finalizer_toolchain(
+    name = "finalizer_x86_64_macos",
+    finalizer = "@finalize_stub_x86_64_macos//file",
+)
+
+toolchain(
+    name = "finalizer_x86_64_macos_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+    toolchain = ":finalizer_x86_64_macos",
+    toolchain_type = "//stub:finalizer_toolchain_type",
+)
+
+stub_finalizer_toolchain(
+    name = "finalizer_x86_64_windows",
+    finalizer = "@finalize_stub_x86_64_windows//file",
+)
+
+toolchain(
+    name = "finalizer_x86_64_windows_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    toolchain = ":finalizer_x86_64_windows",
+    toolchain_type = "//stub:finalizer_toolchain_type",
+)

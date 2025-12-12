@@ -1,0 +1,14 @@
+toolchain_type(
+    name = "template_toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+toolchain_type(
+    name = "template_exec_toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+toolchain_type(
+    name = "finalizer_toolchain_type",
+    visibility = ["//visibility:public"],
+)
