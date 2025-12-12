@@ -897,6 +897,91 @@ jobs:
           echo ""
           echo "✓ All environment export tests passed!"
 
+      - name: Test runtime arguments
+        shell: bash
+        run: |
+          echo "Testing runtime arguments support..."
+
+          # Create a batch script that prints its arguments
+          cat > print-args.bat << 'EOF'
+          @echo off
+          echo ARG0=%0
+          echo ARG1=%1
+          echo ARG2=%2
+          echo ARG3=%3
+          EOF
+
+          # Create finalized stub that runs the batch script
+          ./binaries/finalize-stub-x86_64-windows.exe \
+            --template binaries/runfiles-stub-x86_64-windows.exe \
+            --transform 0 \
+            --output test-runtime-args.exe \
+            -- \
+            C:\\Windows\\System32\\cmd.exe //C print-args.bat
+
+          # Create manifest
+          cat > manifest.txt << 'EOF'
+          C:\Windows\System32\cmd.exe C:\Windows\System32\cmd.exe
+          EOF
+
+          chmod +x test-runtime-args.exe
+
+          # Test 1: No runtime arguments
+          echo ""
+          echo "Test 1: No runtime arguments"
+          RUNFILES_MANIFEST_FILE=manifest.txt ./test-runtime-args.exe > args-test1.txt
+          cat args-test1.txt
+          if grep -q "ARG0=print-args.bat" args-test1.txt && \
+             (grep -q "ARG1=$" args-test1.txt || grep -q "ARG1=%1" args-test1.txt); then
+            echo "✓ No runtime arguments test passed"
+          else
+            echo "✗ ERROR: Unexpected output without runtime arguments"
+            exit 1
+          fi
+
+          # Test 2: Single runtime argument
+          echo ""
+          echo "Test 2: Single runtime argument"
+          RUNFILES_MANIFEST_FILE=manifest.txt ./test-runtime-args.exe hello > args-test2.txt
+          cat args-test2.txt
+          if grep -q "ARG0=print-args.bat" args-test2.txt && grep -q "ARG1=hello" args-test2.txt; then
+            echo "✓ Single runtime argument test passed"
+          else
+            echo "✗ ERROR: Runtime argument not passed correctly"
+            exit 1
+          fi
+
+          # Test 3: Multiple runtime arguments
+          echo ""
+          echo "Test 3: Multiple runtime arguments"
+          RUNFILES_MANIFEST_FILE=manifest.txt ./test-runtime-args.exe arg1 arg2 arg3 > args-test3.txt
+          cat args-test3.txt
+          if grep -q "ARG0=print-args.bat" args-test3.txt && \
+             grep -q "ARG1=arg1" args-test3.txt && \
+             grep -q "ARG2=arg2" args-test3.txt && \
+             grep -q "ARG3=arg3" args-test3.txt; then
+            echo "✓ Multiple runtime arguments test passed"
+          else
+            echo "✗ ERROR: Multiple runtime arguments not passed correctly"
+            exit 1
+          fi
+
+          # Test 4: Runtime argument with spaces (should be quoted)
+          echo ""
+          echo "Test 4: Runtime argument with spaces"
+          RUNFILES_MANIFEST_FILE=manifest.txt ./test-runtime-args.exe "hello world" > args-test4.txt
+          cat args-test4.txt
+          # Windows batch preserves quotes, so we check for either quoted or unquoted
+          if grep -q "ARG0=print-args.bat" args-test4.txt && (grep -q 'ARG1="hello world"' args-test4.txt || grep -q "ARG1=hello world" args-test4.txt); then
+            echo "✓ Quoted runtime argument test passed"
+          else
+            echo "✗ ERROR: Quoted runtime argument not passed correctly"
+            exit 1
+          fi
+
+          echo ""
+          echo "✓ All runtime arguments tests passed!"
+
       - name: Cross-platform finalization test - finalize all templates
         shell: bash
         run: |
