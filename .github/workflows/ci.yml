@@ -1149,3 +1149,122 @@ jobs:
           echo "✓ SUCCESS: All platforms produce identical output!"
           echo "The finalizer is deterministic and platform-independent."
           echo "========================================="
+
+  # Integration tests using the Rust test suite
+  integration-test-linux:
+    name: Integration tests (Linux)
+    needs: merge-artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: ./binaries
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Make binaries executable
+        run: |
+          chmod +x binaries/finalize-stub-x86_64-linux
+          chmod +x binaries/runfiles-stub-x86_64-linux
+
+      - name: Build test suite
+        working-directory: tests
+        run: cargo build --release
+
+      - name: Run integration tests
+        run: |
+          ./tests/target/release/test-runner \
+            --template binaries/runfiles-stub-x86_64-linux \
+            --finalizer binaries/finalize-stub-x86_64-linux \
+            --test-binaries tests/target/release \
+            --work-dir /tmp/runfiles-stub-tests
+
+  integration-test-macos:
+    name: Integration tests (macOS)
+    needs: merge-artifacts
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: ./binaries
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Detect architecture
+        id: arch
+        run: |
+          ARCH=$(uname -m)
+          echo "arch=$ARCH" >> $GITHUB_OUTPUT
+          echo "Detected architecture: $ARCH"
+
+      - name: Make binaries executable
+        run: |
+          if [ "${{ steps.arch.outputs.arch }}" = "arm64" ]; then
+            chmod +x binaries/finalize-stub-aarch64-macos
+            chmod +x binaries/runfiles-stub-aarch64-macos
+          else
+            chmod +x binaries/finalize-stub-x86_64-macos
+            chmod +x binaries/runfiles-stub-x86_64-macos
+          fi
+
+      - name: Build test suite
+        working-directory: tests
+        run: cargo build --release
+
+      - name: Run integration tests
+        run: |
+          if [ "${{ steps.arch.outputs.arch }}" = "arm64" ]; then
+            TEMPLATE="binaries/runfiles-stub-aarch64-macos"
+            FINALIZER="binaries/finalize-stub-aarch64-macos"
+          else
+            TEMPLATE="binaries/runfiles-stub-x86_64-macos"
+            FINALIZER="binaries/finalize-stub-x86_64-macos"
+          fi
+
+          ./tests/target/release/test-runner \
+            --template "$TEMPLATE" \
+            --finalizer "$FINALIZER" \
+            --test-binaries tests/target/release \
+            --work-dir /tmp/runfiles-stub-tests
+
+  integration-test-windows:
+    name: Integration tests (Windows)
+    needs: merge-artifacts
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: ./binaries
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build test suite
+        working-directory: tests
+        run: cargo build --release
+
+      - name: Run integration tests
+        shell: bash
+        run: |
+          ./tests/target/release/test-runner.exe \
+            --template binaries/runfiles-stub-x86_64-windows.exe \
+            --finalizer binaries/finalize-stub-x86_64-windows.exe \
+            --test-binaries tests/target/release \
+            --work-dir "$TEMP/runfiles-stub-tests"
