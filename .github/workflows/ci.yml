@@ -1174,15 +1174,15 @@ jobs:
           chmod +x binaries/runfiles-stub-x86_64-linux
 
       - name: Build test suite
-        working-directory: tests
+        working-directory: integration-tests
         run: cargo build --release
 
       - name: Run integration tests
         run: |
-          ./tests/target/release/test-runner \
+          ./integration-tests/target/release/test-runner \
             --template binaries/runfiles-stub-x86_64-linux \
             --finalizer binaries/finalize-stub-x86_64-linux \
-            --test-binaries tests/target/release \
+            --test-binaries integration-tests/target/release \
             --work-dir /tmp/runfiles-stub-tests
 
   integration-test-macos:
@@ -1220,7 +1220,7 @@ jobs:
           fi
 
       - name: Build test suite
-        working-directory: tests
+        working-directory: integration-tests
         run: cargo build --release
 
       - name: Run integration tests
@@ -1233,10 +1233,10 @@ jobs:
             FINALIZER="binaries/finalize-stub-x86_64-macos"
           fi
 
-          ./tests/target/release/test-runner \
+          ./integration-tests/target/release/test-runner \
             --template "$TEMPLATE" \
             --finalizer "$FINALIZER" \
-            --test-binaries tests/target/release \
+            --test-binaries integration-tests/target/release \
             --work-dir /tmp/runfiles-stub-tests
 
   integration-test-windows:
@@ -1257,14 +1257,14 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build test suite
-        working-directory: tests
+        working-directory: integration-tests
         run: cargo build --release
 
       - name: Run integration tests
         shell: bash
         run: |
-          ./tests/target/release/test-runner.exe \
+          ./integration-tests/target/release/test-runner.exe \
             --template binaries/runfiles-stub-x86_64-windows.exe \
             --finalizer binaries/finalize-stub-x86_64-windows.exe \
-            --test-binaries tests/target/release \
+            --test-binaries integration-tests/target/release \
             --work-dir "$TEMP/runfiles-stub-tests"
