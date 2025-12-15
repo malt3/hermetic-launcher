@@ -1,7 +1,4 @@
-module(
-    name = "hermetic_launcher",
-    version = "0.1.20251212",
-)
+module(name = "hermetic_launcher")
 
 bazel_dep(name = "platforms", version = "1.0.0")
 
