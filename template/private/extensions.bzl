@@ -3,53 +3,53 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 _download_attrs = {
     "finalize-stub-aarch64-linux": {
         "name": "finalize_stub_aarch64_linux",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/finalize-stub-aarch64-linux",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/finalize-stub-aarch64-linux",
         "sha256": "f359e88589167d1c4ff5b06fe60e18bcc1aa16a21d49f81056b46a2d059c9a64",
     },
     "finalize-stub-aarch64-macos": {
         "name": "finalize_stub_aarch64_macos",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/finalize-stub-aarch64-macos",
-        "sha256": "279a6976fc02a3903d2f8ad82edd6b58e50f0bbea6dc87cc0bc72005d3802fee",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/finalize-stub-aarch64-macos",
+        "sha256": "af3533ddc9c5ab3460d7b0521d409cbbf8cc8c519bb6ff3d9d3207af7262700f",
     },
     "finalize-stub-x86_64-linux": {
         "name": "finalize_stub_x86_64_linux",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/finalize-stub-x86_64-linux",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/finalize-stub-x86_64-linux",
         "sha256": "dce220b1ba5a2b44e48070a00e2a260923078bfda1b66f6ee584573ba90562cc",
     },
     "finalize-stub-x86_64-macos": {
         "name": "finalize_stub_x86_64_macos",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/finalize-stub-x86_64-macos",
-        "sha256": "538277b9a5ca20b27e89fcc0497761782c10624eeb6e7aab974d215c2c6b82fe",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/finalize-stub-x86_64-macos",
+        "sha256": "7763aa4f3b8da89428f83d9aed7b94c52dd4288890e7dabc59c0535747fa3ba4",
     },
     "finalize-stub-x86_64-windows.exe": {
         "name": "finalize_stub_x86_64_windows",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/finalize-stub-x86_64-windows.exe",
-        "sha256": "fc8d023ec5dba3e058ad5354b7116b1c586bae22c17638c9a73282ec7b35e900",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/finalize-stub-x86_64-windows.exe",
+        "sha256": "33437574632aef332e994e9265181796b6b695dfc002a35ac171534daef2d0c5",
     },
     "runfiles-stub-aarch64-linux": {
         "name": "runfiles_stub_aarch64_linux",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/runfiles-stub-aarch64-linux",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/runfiles-stub-aarch64-linux",
         "sha256": "b454ce9e990be145e22a3888efc82bfc6a6c1fb15e01703c75221bc5f878aada",
     },
     "runfiles-stub-aarch64-macos": {
         "name": "runfiles_stub_aarch64_macos",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/runfiles-stub-aarch64-macos",
-        "sha256": "6e1234e7c3d888dd6e4d9e51be19216b87b5f70ebdc622eb0d8af856701c13d3",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/runfiles-stub-aarch64-macos",
+        "sha256": "b87e7e6e3bdbded19f681b252bcb79f5dc224e9a3337bb547e707375e26b4a69",
     },
     "runfiles-stub-x86_64-linux": {
         "name": "runfiles_stub_x86_64_linux",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/runfiles-stub-x86_64-linux",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/runfiles-stub-x86_64-linux",
         "sha256": "a54004c133e44cd9eaff833deec4722a9249f42f52c2b2083ed8c3b44ab99e1d",
     },
     "runfiles-stub-x86_64-macos": {
         "name": "runfiles_stub_x86_64_macos",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/runfiles-stub-x86_64-macos",
-        "sha256": "19fa6590570e7c0d1881b9ff5723b9279bd394a4818b933368c35646e46500ad",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/runfiles-stub-x86_64-macos",
+        "sha256": "7852d05a6fad15ed167db1b03ca7cb06a8d0951c983e02ab35a92feabaad082f",
     },
     "runfiles-stub-x86_64-windows.exe": {
         "name": "runfiles_stub_x86_64_windows",
-        "url": "https://github.com/malt3/hermetic-launcher/releases/download/v0.1.20251213/runfiles-stub-x86_64-windows.exe",
-        "sha256": "a93a867cc1db6725c1173d42d427fbaf771d7e2049d3a6967643a631fc393b7e",
+        "url": "https://github.com/malt3/hermetic-launcher/releases/download/binaries-20251215/runfiles-stub-x86_64-windows.exe",
+        "sha256": "f281a03619cc36a9cb89bbf85b0205af29868c4d826836ebc26f52a774ed4611",
     },
 }
 
