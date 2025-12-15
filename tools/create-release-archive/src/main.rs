@@ -53,9 +53,9 @@ fn create_release_archive(output_path: &str) -> Result<()> {
         eprintln!("Added: {}", file);
     }
 
-    // Add template directory recursively
-    let template_dir = repo_root.join("template");
-    add_directory_to_archive(&mut archive, &template_dir, "template")?;
+    // Add launcher directory recursively
+    let launcher_dir = repo_root.join("launcher");
+    add_directory_to_archive(&mut archive, &launcher_dir, "launcher")?;
 
     // Finish writing the archive
     archive.finish()

@@ -1,7 +1,7 @@
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
-load("@hermetic_launcher//template:template_binary.bzl", "template_binary")
+load("@hermetic_launcher//launcher:launcher_binary.bzl", "launcher_binary")
 
-template_binary(
+launcher_binary(
     name = "buildozer_version_command",
     entrypoint = "@buildozer",
     embedded_args = ["version"],

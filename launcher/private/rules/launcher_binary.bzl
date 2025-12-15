@@ -1,13 +1,13 @@
-load(":lib.bzl", "template")
+load(":lib.bzl", "launcher")
 
-def _template_binary_impl(ctx):
+def _launcher_binary_impl(ctx):
     output_basename = ctx.label.name
     if ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]):
         output_basename += ".exe"
     exe = ctx.actions.declare_file(output_basename)
 
     # The entrypoint always needs runfiles expansion at runtime.
-    embedded_args, transformed_args = template.args_from_entrypoint(
+    embedded_args, transformed_args = launcher.args_from_entrypoint(
         executable_file = ctx.executable.entrypoint,
     )
 
@@ -27,13 +27,13 @@ def _template_binary_impl(ctx):
             transformed_args = [str(arg) for arg in ctx.attr.transformed_args]
 
     for arg in ctx.attr.embedded_args:
-        embedded_args, transformed_args = template.append_embedded_arg(
+        embedded_args, transformed_args = launcher.append_embedded_arg(
             arg = ctx.expand_location(arg, targets = [ctx.attr.entrypoint] + ctx.attr.data),
             embedded_args = embedded_args,
             transformed_args = transformed_args,
         )
 
-    template.compile_stub(
+    launcher.compile_stub(
         ctx = ctx,
         embedded_args = embedded_args,
         transformed_args = transformed_args,
@@ -59,7 +59,7 @@ def _template_binary_impl(ctx):
     )]
 
 
-template_binary = rule(
+launcher_binary = rule(
     doc = """Creates a tiny, binary launcher that wraps another executable with its runfiles.
 
 This rule generates a small native binary (10-68KB depending on platform) that:
@@ -75,9 +75,9 @@ or by looking for a <binary>.runfiles/ directory adjacent to the executable.
 **Example - Wrapping openssl to hash a file:**
 
 ```python
-load("@hermetic_launcher//template:template_binary.bzl", "template_binary")
+load("@hermetic_launcher//launcher:launcher_binary.bzl", "launcher_binary")
 
-template_binary(
+launcher_binary(
     name = "hash_file",
     entrypoint = "@openssl",
     embedded_args = [
@@ -114,14 +114,14 @@ are automatically transformed through runfiles. You can customize this with `tra
 The same BUILD file works on Linux, macOS, and Windows. The launcher handles platform-specific
 path separators and runfiles resolution automatically.
 """,
-    implementation = _template_binary_impl,
+    implementation = _launcher_binary_impl,
     attrs = {
         "entrypoint": attr.label(
             doc = """The target executable to wrap. This is the actual program that will be executed.
 
 The entrypoint's runfiles path will be automatically resolved at runtime through the Bazel
 runfiles mechanism. This must be an executable target (e.g., a binary, a script, or another
-template_binary).
+launcher_binary).
 
 Example: `entrypoint = "@python_3_11//:python"` or `entrypoint = "//tools:my_tool"`
 """,
@@ -195,7 +195,7 @@ data = [
     },
     executable = True,
     toolchains = [
-        "@hermetic_launcher//template:template_toolchain_type",
-        "@hermetic_launcher//template:finalizer_toolchain_type",
+        "@hermetic_launcher//launcher:template_toolchain_type",
+        "@hermetic_launcher//launcher:finalizer_toolchain_type",
     ],
 )

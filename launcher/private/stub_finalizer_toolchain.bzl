@@ -1,6 +1,6 @@
 """Implementation of the stub_finalizer_toolchain rule."""
 
-load("//template/private/providers:finalizer_toolchain_info.bzl", "FinalizerToolchainInfo")
+load("//launcher/private/providers:finalizer_toolchain_info.bzl", "FinalizerToolchainInfo")
 
 DOC = """\
 Defines an image builder toolchain.
@@ -18,7 +18,7 @@ ATTRS = dict(
     ),
 )
 
-TOOLCHAIN_TYPE = str(Label("//template:finalizer_toolchain_type"))
+TOOLCHAIN_TYPE = str(Label("//launcher:finalizer_toolchain_type"))
 
 def _stub_finalizer_toolchain_impl(ctx):
     stub_finalizer_toolchain_info = FinalizerToolchainInfo(

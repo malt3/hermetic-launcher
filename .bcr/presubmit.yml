@@ -1,5 +1,5 @@
 bcr_test_module:
-  module_path: "."
+  module_path: "launcher/private/smoke"
   matrix:
     platform: ["debian10", "ubuntu2004", "macos", "macos_arm64", "windows"]
     bazel: [7.x, 8.x, 9.*]

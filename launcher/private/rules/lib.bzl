@@ -1,13 +1,13 @@
 def _get_finalizer(ctx):
-    toolchain = ctx.toolchains["@hermetic_launcher//template:finalizer_toolchain_type"]
+    toolchain = ctx.toolchains["@hermetic_launcher//launcher:finalizer_toolchain_type"]
     return toolchain.finalizer_info.finalizer
 
 def _get_template(ctx, *, cfg = "target", template_exec_group = None):
     toolchain_dict = ctx.toolchains if template_exec_group == None else ctx.exec_groups[template_exec_group].toolchains
     if cfg == "target":
-        toolchain = toolchain_dict["@hermetic_launcher//template:template_toolchain_type"]
+        toolchain = toolchain_dict["@hermetic_launcher//launcher:template_toolchain_type"]
     elif cfg == "exec":
-        toolchain = toolchain_dict["@hermetic_launcher//template:template_exec_toolchain_type"]
+        toolchain = toolchain_dict["@hermetic_launcher//launcher:template_exec_toolchain_type"]
     else:
         fail("Invalid cfg '%s': must be 'target' or 'exec'" % cfg)
     return toolchain.tempaltetoolchaininfo.template_exe
@@ -53,14 +53,14 @@ def _compile_stub(*, ctx, embedded_args, transformed_args, output_file, cfg = "t
     )
     return output_file
 
-template = struct(
+launcher = struct(
     to_rlocation_path = _to_rlocation_path,
     args_from_entrypoint = _args_from_entrypoint,
     append_runfile = _append_runfile,
     append_embedded_arg = _append_embedded_arg,
     append_raw_transformed_arg = _append_raw_transformed_arg,
     compile_stub = _compile_stub,
-    finalizer_toolchain_type = "@hermetic_launcher//template:finalizer_toolchain_type",
-    template_toolchain_type = "@hermetic_launcher//template:template_toolchain_type",
-    template_exec_toolchain_type = "@hermetic_launcher//template:template_exec_toolchain_type",
+    finalizer_toolchain_type = "@hermetic_launcher//launcher:finalizer_toolchain_type",
+    template_toolchain_type = "@hermetic_launcher//launcher:template_toolchain_type",
+    template_exec_toolchain_type = "@hermetic_launcher//launcher:template_exec_toolchain_type",
 )

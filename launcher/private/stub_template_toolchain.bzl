@@ -1,6 +1,6 @@
 """Implementation of the stub_template_toolchain rule."""
 
-load("//template/private/providers:stub_template_toolchain_info.bzl", "TemplateToolchainInfo")
+load("//launcher/private/providers:stub_template_toolchain_info.bzl", "TemplateToolchainInfo")
 
 DOC = """\
 Defines an stub template toolchain.
@@ -17,7 +17,7 @@ ATTRS = dict(
     ),
 )
 
-TOOLCHAIN_TYPE = str(Label("//template:template_toolchain_type"))
+TOOLCHAIN_TYPE = str(Label("//launcher:template_toolchain_type"))
 
 def _stub_template_toolchain_impl(ctx):
     stub_template_toolchain_info = TemplateToolchainInfo(

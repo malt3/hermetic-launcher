@@ -1,5 +1,5 @@
-load("//template/private:stub_template_toolchain.bzl", "stub_template_toolchain")
-load("//template/private:stub_finalizer_toolchain.bzl", "stub_finalizer_toolchain")
+load("//launcher/private:stub_template_toolchain.bzl", "stub_template_toolchain")
+load("//launcher/private:stub_finalizer_toolchain.bzl", "stub_finalizer_toolchain")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -15,7 +15,7 @@ toolchain(
         "@platforms//os:linux",
     ],
     toolchain = ":template_aarch64_linux",
-    toolchain_type = "//template:template_toolchain_type",
+    toolchain_type = "//launcher:template_toolchain_type",
 )
 
 toolchain(
@@ -25,7 +25,7 @@ toolchain(
         "@platforms//os:linux",
     ],
     toolchain = ":template_aarch64_linux",
-    toolchain_type = "//template:template_exec_toolchain_type",
+    toolchain_type = "//launcher:template_exec_toolchain_type",
 )
 
 stub_template_toolchain(
@@ -40,7 +40,7 @@ toolchain(
         "@platforms//os:macos",
     ],
     toolchain = ":template_aarch64_macos",
-    toolchain_type = "//template:template_toolchain_type",
+    toolchain_type = "//launcher:template_toolchain_type",
 )
 
 toolchain(
@@ -50,7 +50,7 @@ toolchain(
         "@platforms//os:macos",
     ],
     toolchain = ":template_aarch64_macos",
-    toolchain_type = "//template:template_exec_toolchain_type",
+    toolchain_type = "//launcher:template_exec_toolchain_type",
 )
 
 stub_template_toolchain(
@@ -65,7 +65,7 @@ toolchain(
         "@platforms//os:linux",
     ],
     toolchain = ":template_x86_64_linux",
-    toolchain_type = "//template:template_toolchain_type",
+    toolchain_type = "//launcher:template_toolchain_type",
 )
 
 toolchain(
@@ -75,7 +75,7 @@ toolchain(
         "@platforms//os:linux",
     ],
     toolchain = ":template_x86_64_linux",
-    toolchain_type = "//template:template_exec_toolchain_type",
+    toolchain_type = "//launcher:template_exec_toolchain_type",
 )
 
 stub_template_toolchain(
@@ -90,7 +90,7 @@ toolchain(
         "@platforms//os:macos",
     ],
     toolchain = ":template_x86_64_macos",
-    toolchain_type = "//template:template_toolchain_type",
+    toolchain_type = "//launcher:template_toolchain_type",
 )
 
 toolchain(
@@ -100,7 +100,7 @@ toolchain(
         "@platforms//os:macos",
     ],
     toolchain = ":template_x86_64_macos",
-    toolchain_type = "//template:template_exec_toolchain_type",
+    toolchain_type = "//launcher:template_exec_toolchain_type",
 )
 
 stub_template_toolchain(
@@ -115,7 +115,7 @@ toolchain(
         "@platforms//os:windows",
     ],
     toolchain = ":template_x86_64_windows",
-    toolchain_type = "//template:template_toolchain_type",
+    toolchain_type = "//launcher:template_toolchain_type",
 )
 
 toolchain(
@@ -125,7 +125,7 @@ toolchain(
         "@platforms//os:windows",
     ],
     toolchain = ":template_x86_64_windows",
-    toolchain_type = "//template:template_exec_toolchain_type",
+    toolchain_type = "//launcher:template_exec_toolchain_type",
 )
 
 stub_finalizer_toolchain(
@@ -140,7 +140,7 @@ toolchain(
         "@platforms//os:linux",
     ],
     toolchain = ":finalizer_aarch64_linux",
-    toolchain_type = "//template:finalizer_toolchain_type",
+    toolchain_type = "//launcher:finalizer_toolchain_type",
 )
 
 stub_finalizer_toolchain(
@@ -155,7 +155,7 @@ toolchain(
         "@platforms//os:macos",
     ],
     toolchain = ":finalizer_aarch64_macos",
-    toolchain_type = "//template:finalizer_toolchain_type",
+    toolchain_type = "//launcher:finalizer_toolchain_type",
 )
 
 stub_finalizer_toolchain(
@@ -170,7 +170,7 @@ toolchain(
         "@platforms//os:linux",
     ],
     toolchain = ":finalizer_x86_64_linux",
-    toolchain_type = "//template:finalizer_toolchain_type",
+    toolchain_type = "//launcher:finalizer_toolchain_type",
 )
 
 stub_finalizer_toolchain(
@@ -185,7 +185,7 @@ toolchain(
         "@platforms//os:macos",
     ],
     toolchain = ":finalizer_x86_64_macos",
-    toolchain_type = "//template:finalizer_toolchain_type",
+    toolchain_type = "//launcher:finalizer_toolchain_type",
 )
 
 stub_finalizer_toolchain(
@@ -200,5 +200,5 @@ toolchain(
         "@platforms//os:windows",
     ],
     toolchain = ":finalizer_x86_64_windows",
-    toolchain_type = "//template:finalizer_toolchain_type",
+    toolchain_type = "//launcher:finalizer_toolchain_type",
 )
