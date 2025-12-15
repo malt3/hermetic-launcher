@@ -4,7 +4,7 @@ load("@hermetic_launcher//launcher:launcher_binary.bzl", "launcher_binary")
 launcher_binary(
     name = "buildozer_version_command",
     entrypoint = "@buildozer",
-    embedded_args = ["version"],
+    embedded_args = ["--version"],
 )
 
 build_test(
