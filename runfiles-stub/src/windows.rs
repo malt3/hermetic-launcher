@@ -467,13 +467,8 @@ impl Runfiles {
     }
 
     fn rlocation(&self, path: &[u8], result_idx: usize) -> Option<&'static [u8]> {
-        // If path is absolute, don't resolve:
-        // - Windows: starts with drive letter (C:) or UNC (\\)
-        // - Unix: starts with forward slash (/)
+        // If path is absolute (Windows: starts with drive letter or \\), don't resolve
         if path.len() >= 2 && ((path[0].is_ascii_alphabetic() && path[1] == b':') || (path[0] == b'\\' && path[1] == b'\\')) {
-            return None;
-        }
-        if !path.is_empty() && path[0] == b'/' {
             return None;
         }
 

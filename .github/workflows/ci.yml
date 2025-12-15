@@ -806,34 +806,36 @@ jobs:
           echo "=== Testing Environment Variable Export (enabled) ==="
 
           # Create a batch script that prints runfiles environment variables
-          # Use Windows-compatible path (convert MSYS/Git Bash path to Windows path)
-          PRINT_ENV_PATH="$(pwd)/print-env.bat"
-          cat > "$PRINT_ENV_PATH" << 'EOF'
+          cat > print-env.bat << 'EOF'
           @echo off
           echo RUNFILES_DIR=%RUNFILES_DIR%
           echo RUNFILES_MANIFEST_FILE=%RUNFILES_MANIFEST_FILE%
           echo JAVA_RUNFILES=%JAVA_RUNFILES%
           EOF
-          chmod +x "$PRINT_ENV_PATH"
+          chmod +x print-env.bat
 
-          # Convert to Windows path for use in manifest
-          PRINT_ENV_WIN="$(cygpath -w "$PRINT_ENV_PATH")"
+          # Get absolute Windows path with forward slashes (Bazel manifest format)
+          # cygpath -w gives C:\path, then tr converts backslashes to forward slashes
+          PRINT_ENV_WIN="$(cygpath -w "$(pwd)/print-env.bat" | tr '\\' '/')"
+          echo "Debug: Windows path (forward slashes): $PRINT_ENV_WIN"
 
           # Create stub with export enabled (default)
+          # Use relative rlocation path on left, absolute Windows path with forward slashes on right
           ./binaries/finalize-stub-x86_64-windows.exe \
             --template binaries/runfiles-stub-x86_64-windows.exe \
             --transform 0 \
             --export-runfiles-env true \
             --output test-export-enabled.exe \
             -- \
-            "$PRINT_ENV_WIN"
+            print-env.bat
           chmod +x test-export-enabled.exe
 
           # Test with manifest-based runfiles
+          # Manifest format: relative_path absolute_path_with_forward_slashes
           echo ""
           echo "Test 1: Manifest-based mode"
           cat > test-manifest.txt << EOF
-          $PRINT_ENV_WIN $PRINT_ENV_WIN
+          print-env.bat $PRINT_ENV_WIN
           EOF
           echo "Output from child process:"
           RUNFILES_MANIFEST_FILE=test-manifest.txt ./test-export-enabled.exe > export-test-manifest.txt
@@ -879,9 +881,6 @@ jobs:
           echo "=== Testing Environment Variable Export (disabled) ==="
 
           # Reuse the print-env.bat from previous test
-          PRINT_ENV_PATH="$(pwd)/print-env.bat"
-          PRINT_ENV_WIN="$(cygpath -w "$PRINT_ENV_PATH")"
-
           # Create stub with export disabled
           ./binaries/finalize-stub-x86_64-windows.exe \
             --template binaries/runfiles-stub-x86_64-windows.exe \
@@ -889,7 +888,7 @@ jobs:
             --export-runfiles-env false \
             --output test-export-disabled.exe \
             -- \
-            "$PRINT_ENV_WIN"
+            print-env.bat
           chmod +x test-export-disabled.exe
 
           # Test with empty environment and fallback directory
