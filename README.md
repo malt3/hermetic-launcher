@@ -1,4 +1,4 @@
-# Runfiles Stub
+# Hermetic Launcher
 
 A minimal, cross-platform Bazel runfiles stub runner that replaces shell scripts with tiny native binaries.
 
@@ -58,8 +58,8 @@ This enables Bazel rules to create tiny, platform-agnostic entrypoints that work
 ```bash
 # Download from GitHub releases
 VERSION=v0.1.20251211
-wget https://github.com/malt3/runfiles-stub/releases/download/${VERSION}/runfiles-stub-x86_64-linux
-wget https://github.com/malt3/runfiles-stub/releases/download/${VERSION}/finalize-stub-x86_64-linux
+wget https://github.com/malt3/hermetic-launcher/releases/download/${VERSION}/runfiles-stub-x86_64-linux
+wget https://github.com/malt3/hermetic-launcher/releases/download/${VERSION}/finalize-stub-x86_64-linux
 chmod +x finalize-stub-x86_64-linux
 ```
 
@@ -335,7 +335,7 @@ Sizes vary by platform due to different linking requirements:
 
 Create consistent wrappers for tools that need runfiles.
 A good example for this is interpreted languages, where you have an interpreter binary and an entrypoint.
-Neither are good to be used as the "executable" file of a Bazel "*_binary" rule, so the runfiles-stub can be used to invoke the interpreter with a path to the script entrypoint.
+Neither are good to be used as the "executable" file of a Bazel "*_binary" rule, so hermetic-launcher can be used to invoke the interpreter with a path to the script entrypoint.
 Rule syntax TBD.
 
 ### 2. Test Runners

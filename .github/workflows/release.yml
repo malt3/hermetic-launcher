@@ -196,7 +196,7 @@ jobs:
         id: release_notes
         run: |
           cat > release_notes.md << 'EOF'
-          ## Runfiles Stub ${{ steps.tag.outputs.tag }}
+          ## Hermetic Launcher ${{ steps.tag.outputs.tag }}
 
           Minimal, dependency-free Bazel runfiles stub runner for Linux, macOS, and Windows.
 
