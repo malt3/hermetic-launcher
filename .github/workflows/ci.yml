@@ -1011,7 +1011,7 @@ jobs:
             --template binaries/runfiles-stub-x86_64-linux \
             --finalizer binaries/finalize-stub-x86_64-linux \
             --test-binaries integration-tests/target/release \
-            --work-dir /tmp/runfiles-stub-tests
+            --work-dir /tmp/hermetic-launcher-tests
 
   integration-test-macos:
     name: Integration tests (macOS)
@@ -1065,7 +1065,7 @@ jobs:
             --template "$TEMPLATE" \
             --finalizer "$FINALIZER" \
             --test-binaries integration-tests/target/release \
-            --work-dir /tmp/runfiles-stub-tests
+            --work-dir /tmp/hermetic-launcher-tests
 
   integration-test-windows:
     name: Integration tests (Windows)
@@ -1095,4 +1095,4 @@ jobs:
             --template binaries/runfiles-stub-x86_64-windows.exe \
             --finalizer binaries/finalize-stub-x86_64-windows.exe \
             --test-binaries integration-tests/target/release \
-            --work-dir "$TEMP/runfiles-stub-tests"
+            --work-dir "$TEMP/hermetic-launcher-tests"

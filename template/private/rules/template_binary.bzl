@@ -1,13 +1,13 @@
-load(":lib.bzl", "stub")
+load(":lib.bzl", "template")
 
-def _stub_binary_impl(ctx):
+def _template_binary_impl(ctx):
     output_basename = ctx.label.name
     if ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]):
         output_basename += ".exe"
     exe = ctx.actions.declare_file(output_basename)
 
     # The entrypoint always needs runfiles expansion at runtime.
-    embedded_args, transformed_args = stub.args_from_entrypoint(
+    embedded_args, transformed_args = template.args_from_entrypoint(
         executable_file = ctx.executable.entrypoint,
     )
 
@@ -27,13 +27,13 @@ def _stub_binary_impl(ctx):
             transformed_args = [str(arg) for arg in ctx.attr.transformed_args]
 
     for arg in ctx.attr.embedded_args:
-        embedded_args, transformed_args = stub.append_embedded_arg(
+        embedded_args, transformed_args = template.append_embedded_arg(
             arg = ctx.expand_location(arg, targets = [ctx.attr.entrypoint] + ctx.attr.data),
             embedded_args = embedded_args,
             transformed_args = transformed_args,
         )
 
-    stub.compile_stub(
+    template.compile_stub(
         ctx = ctx,
         embedded_args = embedded_args,
         transformed_args = transformed_args,
@@ -59,8 +59,8 @@ def _stub_binary_impl(ctx):
     )]
 
 
-stub_binary = rule(
-    doc = """Creates a tiny, binary stub that wraps another executable with its runfiles.
+template_binary = rule(
+    doc = """Creates a tiny, binary launcher that wraps another executable with its runfiles.
 
 This rule generates a small native binary (10-68KB depending on platform) that:
 - Resolves Bazel runfiles paths at runtime
@@ -69,15 +69,15 @@ This rule generates a small native binary (10-68KB depending on platform) that:
 - Exports runfiles environment variables to child processes
 - Works identically on Linux, macOS, and Windows
 
-The stub automatically detects runfiles using RUNFILES_DIR, RUNFILES_MANIFEST_FILE,
-or by looking for a <stub>.runfiles/ directory adjacent to the executable.
+The launcher automatically detects runfiles using RUNFILES_DIR, RUNFILES_MANIFEST_FILE,
+or by looking for a <binary>.runfiles/ directory adjacent to the executable.
 
 **Example - Wrapping openssl to hash a file:**
 
 ```python
-load("@rules_runfiles_stub//stub:stub_binary.bzl", "stub_binary")
+load("@hermetic_launcher//template:template_binary.bzl", "template_binary")
 
-stub_binary(
+template_binary(
     name = "hash_file",
     entrypoint = "@openssl",
     embedded_args = [
@@ -89,7 +89,7 @@ stub_binary(
 )
 ```
 
-The stub will:
+The launcher will:
 1. Resolve the openssl binary location through runfiles
 2. Resolve file_to_hash.txt location through runfiles (auto-detected from $(rlocationpath))
 3. Execute: `openssl dgst -sha256 /resolved/path/to/file_to_hash.txt`
@@ -97,7 +97,7 @@ The stub will:
 
 **Runtime argument forwarding:**
 
-Additional arguments passed to the stub are forwarded to the entrypoint:
+Additional arguments passed to the binary are forwarded to the entrypoint:
 
 ```bash
 bazel run //:hash_file -- --some-extra-flag
@@ -111,17 +111,17 @@ are automatically transformed through runfiles. You can customize this with `tra
 
 **Cross-platform:**
 
-The same BUILD file works on Linux, macOS, and Windows. The stub handles platform-specific
+The same BUILD file works on Linux, macOS, and Windows. The launcher handles platform-specific
 path separators and runfiles resolution automatically.
 """,
-    implementation = _stub_binary_impl,
+    implementation = _template_binary_impl,
     attrs = {
         "entrypoint": attr.label(
             doc = """The target executable to wrap. This is the actual program that will be executed.
 
 The entrypoint's runfiles path will be automatically resolved at runtime through the Bazel
 runfiles mechanism. This must be an executable target (e.g., a binary, a script, or another
-stub_binary).
+template_binary).
 
 Example: `entrypoint = "@python_3_11//:python"` or `entrypoint = "//tools:my_tool"`
 """,
@@ -130,9 +130,9 @@ Example: `entrypoint = "@python_3_11//:python"` or `entrypoint = "//tools:my_too
             mandatory = True,
         ),
         "embedded_args": attr.string_list(
-            doc = """Arguments to embed in the stub that will be passed to the entrypoint.
+            doc = """Arguments to embed in the binary that will be passed to the entrypoint.
 
-These arguments are baked into the stub binary at build time. They support Bazel location
+These arguments are baked into the binary at build time. They support Bazel location
 expansion (e.g., `$(rlocationpath)`, `$(location)`, `$(execpath)`).
 
 Arguments matching the pattern `$(rlocationpath ...)` are automatically detected and marked
@@ -176,7 +176,7 @@ Use this when you want fine-grained control over which paths are resolved throug
         "data": attr.label_list(
             doc = """Runtime dependencies (data files, scripts, etc.) needed by the entrypoint.
 
-These files and their transitive runfiles will be included in the stub's runfiles tree,
+These files and their transitive runfiles will be included in the binary's runfiles tree,
 making them available at runtime. Use `$(rlocationpath)` to reference these files in
 `embedded_args`.
 
@@ -195,7 +195,7 @@ data = [
     },
     executable = True,
     toolchains = [
-        "@rules_runfiles_stub//stub:template_toolchain_type",
-        "@rules_runfiles_stub//stub:finalizer_toolchain_type",
+        "@hermetic_launcher//template:template_toolchain_type",
+        "@hermetic_launcher//template:finalizer_toolchain_type",
     ],
 )
