@@ -399,7 +399,7 @@ impl Runfiles {
     fn create(executable_path: Option<&[u8]>) -> Option<Self> {
         let mut manifest_path = [0u8; MAX_PATH_LEN];
 
-        // Try RUNFILES_MANIFEST_FILE first
+        // Step 1: Try RUNFILES_MANIFEST_FILE envvar first
         if let Some(len) = get_env_var(b"RUNFILES_MANIFEST_FILE", &mut manifest_path) {
             if len > 0 {
                 if let Some(manifest) = load_manifest(&manifest_path[..len]) {
@@ -412,7 +412,7 @@ impl Runfiles {
             }
         }
 
-        // Try RUNFILES_DIR
+        // Step 2: Try RUNFILES_DIR envvar
         let mut runfiles_dir = [0u8; MAX_PATH_LEN];
         if let Some(len) = get_env_var(b"RUNFILES_DIR", &mut runfiles_dir) {
             if len > 0 {
@@ -424,40 +424,118 @@ impl Runfiles {
             }
         }
 
-        // Try to infer runfiles directory from executable path
-        // Pattern: <executable_path>.runfiles\
+        // Step 3: Try to find runfiles next to the executable
+        // Check for <executable>.runfiles_manifest file (preferred)
+        // Then check for <executable>.runfiles directory
         if let Some(exe_path) = executable_path {
             let exe_len = strlen(exe_path);
-            if exe_len > 0 && exe_len + 10 < MAX_PATH_LEN {  // +10 for ".runfiles\0"
-                let mut runfiles_dir = [0u8; MAX_PATH_LEN];
+            if exe_len > 0 {
+                // Try <executable>.runfiles_manifest file first
+                if exe_len + 18 < MAX_PATH_LEN {  // +18 for ".runfiles_manifest\0"
+                    let mut manifest_file_path = [0u8; MAX_PATH_LEN];
 
-                // Copy executable path
-                runfiles_dir[..exe_len].copy_from_slice(&exe_path[..exe_len]);
+                    // Copy executable path
+                    manifest_file_path[..exe_len].copy_from_slice(&exe_path[..exe_len]);
 
-                // Append ".runfiles"
-                runfiles_dir[exe_len..exe_len + 9].copy_from_slice(b".runfiles");
-                runfiles_dir[exe_len + 9] = 0; // null terminator
+                    // Append ".runfiles_manifest"
+                    manifest_file_path[exe_len..exe_len + 17].copy_from_slice(b".runfiles_manifest");
+                    let manifest_file_len = exe_len + 17;
 
-                // Check if directory exists by trying to open it
-                unsafe {
-                    const FILE_FLAG_BACKUP_SEMANTICS: DWORD = 0x02000000;  // Needed to open directories
-                    let handle = CreateFileA(
-                        runfiles_dir.as_ptr(),
-                        GENERIC_READ,
-                        0,
-                        core::ptr::null_mut(),
-                        OPEN_EXISTING,
-                        FILE_FLAG_BACKUP_SEMANTICS,
-                        core::ptr::null_mut(),
-                    );
-                    if handle != INVALID_HANDLE_VALUE {
-                        CloseHandle(handle);
-                        // Remove null terminator for internal storage
-                        return Some(Self {
-                            mode: RunfilesMode::DirectoryBased(runfiles_dir, exe_len + 9),
-                            manifest_path: None,
-                            dir_path: Some((runfiles_dir, exe_len + 9)),
-                        });
+                    // Try to load the manifest file
+                    if let Some(manifest) = load_manifest(&manifest_file_path[..manifest_file_len]) {
+                        // Also determine the runfiles directory for RUNFILES_DIR envvar
+                        // The directory is <executable>.runfiles
+                        let mut dir_path = [0u8; MAX_PATH_LEN];
+                        if exe_len + 9 < MAX_PATH_LEN {
+                            dir_path[..exe_len].copy_from_slice(&exe_path[..exe_len]);
+                            dir_path[exe_len..exe_len + 9].copy_from_slice(b".runfiles");
+                            let dir_len = exe_len + 9;
+
+                            return Some(Self {
+                                mode: RunfilesMode::ManifestBased(manifest),
+                                manifest_path: Some((manifest_file_path, manifest_file_len)),
+                                dir_path: Some((dir_path, dir_len)),
+                            });
+                        } else {
+                            return Some(Self {
+                                mode: RunfilesMode::ManifestBased(manifest),
+                                manifest_path: Some((manifest_file_path, manifest_file_len)),
+                                dir_path: None,
+                            });
+                        }
+                    }
+                }
+
+                // Try <executable>.runfiles\MANIFEST file
+                // This handles cases where the runfiles dir exists with only a MANIFEST inside,
+                // but the .runfiles_manifest file next to the executable is missing
+                if exe_len + 19 < MAX_PATH_LEN {  // +19 for ".runfiles\MANIFEST\0"
+                    let mut manifest_file_path = [0u8; MAX_PATH_LEN];
+
+                    // Copy executable path
+                    manifest_file_path[..exe_len].copy_from_slice(&exe_path[..exe_len]);
+
+                    // Append ".runfiles\MANIFEST"
+                    manifest_file_path[exe_len..exe_len + 18].copy_from_slice(b".runfiles\\MANIFEST");
+                    let manifest_file_len = exe_len + 18;
+
+                    // Try to load the manifest file
+                    if let Some(manifest) = load_manifest(&manifest_file_path[..manifest_file_len]) {
+                        // Also determine the runfiles directory for RUNFILES_DIR envvar
+                        // The directory is <executable>.runfiles
+                        let mut dir_path = [0u8; MAX_PATH_LEN];
+                        if exe_len + 9 < MAX_PATH_LEN {
+                            dir_path[..exe_len].copy_from_slice(&exe_path[..exe_len]);
+                            dir_path[exe_len..exe_len + 9].copy_from_slice(b".runfiles");
+                            let dir_len = exe_len + 9;
+
+                            return Some(Self {
+                                mode: RunfilesMode::ManifestBased(manifest),
+                                manifest_path: Some((manifest_file_path, manifest_file_len)),
+                                dir_path: Some((dir_path, dir_len)),
+                            });
+                        } else {
+                            return Some(Self {
+                                mode: RunfilesMode::ManifestBased(manifest),
+                                manifest_path: Some((manifest_file_path, manifest_file_len)),
+                                dir_path: None,
+                            });
+                        }
+                    }
+                }
+
+                // Try <executable>.runfiles directory
+                if exe_len + 9 < MAX_PATH_LEN {  // +9 for ".runfiles\0"
+                    let mut runfiles_dir = [0u8; MAX_PATH_LEN];
+
+                    // Copy executable path
+                    runfiles_dir[..exe_len].copy_from_slice(&exe_path[..exe_len]);
+
+                    // Append ".runfiles"
+                    runfiles_dir[exe_len..exe_len + 9].copy_from_slice(b".runfiles");
+                    runfiles_dir[exe_len + 9] = 0; // null terminator
+
+                    // Check if directory exists by trying to open it
+                    unsafe {
+                        const FILE_FLAG_BACKUP_SEMANTICS: DWORD = 0x02000000;  // Needed to open directories
+                        let handle = CreateFileA(
+                            runfiles_dir.as_ptr(),
+                            GENERIC_READ,
+                            0,
+                            core::ptr::null_mut(),
+                            OPEN_EXISTING,
+                            FILE_FLAG_BACKUP_SEMANTICS,
+                            core::ptr::null_mut(),
+                        );
+                        if handle != INVALID_HANDLE_VALUE {
+                            CloseHandle(handle);
+                            // Remove null terminator for internal storage
+                            return Some(Self {
+                                mode: RunfilesMode::DirectoryBased(runfiles_dir, exe_len + 9),
+                                manifest_path: None,
+                                dir_path: Some((runfiles_dir, exe_len + 9)),
+                            });
+                        }
                     }
                 }
             }
