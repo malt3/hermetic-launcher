@@ -1,0 +1,13 @@
+starlark_doc_extract(
+    name = "launcher_binary",
+    deps = ["//launcher:launcher_binary_bzl"],
+    src = "//launcher:launcher_binary.bzl",
+    render_main_repo_name = True,
+)
+
+starlark_doc_extract(
+    name = "lib",
+    deps = ["//launcher:lib_bzl"],
+    src = "//launcher:lib.bzl",
+    render_main_repo_name = True,
+)
