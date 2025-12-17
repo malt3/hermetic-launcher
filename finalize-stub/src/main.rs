@@ -172,6 +172,9 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
         }
     }
 
+    // Post-process the finalized binary (e.g., re-signing)
+    data = post_process_binary(data, verbose)?;
+
     // Write output
     if let Some(output) = output_path {
         fs::write(output, &data)
@@ -199,6 +202,74 @@ fn finalize_stub(template_path: &str, output_path: Option<&str>, argv: &[String]
     }
 
     Ok(())
+}
+
+/// Post-processes a finalized binary based on its format
+fn post_process_binary(data: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
+    // Try Mach-O signing first
+    if is_macho(&data) {
+        if verbose {
+            eprintln!("Post-processing: Detected Mach-O binary");
+        }
+        return resign_macho(data, verbose);
+    }
+
+    // Future: Add Windows PE signing here
+    // if is_pe(&data) {
+    //     if verbose {
+    //         eprintln!("Post-processing: Detected PE binary");
+    //     }
+    //     return sign_pe(data, verbose);
+    // }
+
+    // No post-processing needed for this binary format
+    Ok(data)
+}
+
+/// Checks if data is a Mach-O binary by examining magic bytes
+fn is_macho(data: &[u8]) -> bool {
+    if data.len() < 4 {
+        return false;
+    }
+
+    // Check for Mach-O magic numbers
+    let magic = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+    matches!(magic,
+        0xfeedface |  // MH_MAGIC (32-bit)
+        0xfeedfacf |  // MH_MAGIC_64 (64-bit)
+        0xcefaedfe |  // MH_CIGAM (32-bit, swapped)
+        0xcffaedfe    // MH_CIGAM_64 (64-bit, swapped)
+    )
+}
+
+/// Re-signs a Mach-O binary with an ad-hoc signature
+fn resign_macho(data: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
+    use apple_codesign::{MachOSigner, SigningSettings};
+
+    // Parse the Mach-O binary
+    let signer = MachOSigner::new(&data)
+        .map_err(|e| format!("Failed to parse Mach-O binary: {}", e))?;
+
+    if verbose {
+        eprintln!("Applying ad-hoc signature to Mach-O binary...");
+    }
+
+    // Create ad-hoc signing settings (no certificate = ad-hoc)
+    let mut settings = SigningSettings::default();
+    settings.set_binary_identifier(apple_codesign::SettingsScope::Main, "runfiles-stub");
+
+    // Sign the binary
+    let mut signed_data = Vec::new();
+    signer.write_signed_binary(&settings, &mut signed_data)
+        .map_err(|e| format!("Failed to sign Mach-O binary: {}", e))?;
+
+    if verbose {
+        eprintln!("Successfully signed Mach-O binary");
+        eprintln!("  Original size: {} bytes", data.len());
+        eprintln!("  Signed size: {} bytes", signed_data.len());
+    }
+
+    Ok(signed_data)
 }
 
 fn main() {

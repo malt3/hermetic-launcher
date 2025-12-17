@@ -475,6 +475,49 @@ jobs:
           shasum -a 256 test-stub-macos
           echo "SHA256 (macOS stub): $(shasum -a 256 test-stub-macos | cut -d' ' -f1)"
 
+      - name: Verify code signature
+        run: |
+          echo "=== Verifying Code Signature on Finalized Binary ==="
+          echo ""
+          echo "This test verifies that the finalizer correctly re-signs Mach-O binaries"
+          echo "after modifying them. Without proper signing, ARM64 macOS binaries will"
+          echo "crash with 'Code Signature Invalid' errors."
+          echo ""
+
+          # Verify the signature is present and valid
+          echo "1. Checking signature validity..."
+          if codesign --verify --verbose test-stub-macos; then
+            echo "✓ Signature is valid"
+          else
+            echo "✗ ERROR: Signature verification failed!"
+            echo "This means the binary is not properly signed."
+            exit 1
+          fi
+
+          echo ""
+          echo "2. Displaying signature details..."
+          codesign -d -vv test-stub-macos
+
+          echo ""
+          echo "3. Verifying this is an ad-hoc signature..."
+          if codesign -d -vv test-stub-macos 2>&1 | grep -q "Signature=adhoc"; then
+            echo "✓ Binary has ad-hoc signature (as expected)"
+          else
+            echo "⚠ WARNING: Binary does not show 'adhoc' signature type"
+            echo "This may be acceptable, but worth investigating."
+            # Don't fail, as the format may vary across macOS versions
+          fi
+
+          echo ""
+          echo "4. Checking code signature requirements..."
+          codesign -d -r- test-stub-macos || echo "No specific requirements (expected for ad-hoc)"
+
+          echo ""
+          echo "========================================="
+          echo "✓ Code signature verification passed!"
+          echo "The finalized binary is properly signed."
+          echo "========================================="
+
       - name: Run macOS template (native)
         run: |
           echo "Running native macOS stub..."
@@ -702,6 +745,34 @@ jobs:
           echo ""
           echo "SHA256 hashes computed on macOS:"
           cat cross-platform-test/sha256sums-macos.txt
+
+      - name: Verify code signatures on cross-platform finalized macOS binaries
+        run: |
+          echo "=== Verifying Code Signatures on Cross-Platform Finalized Binaries ==="
+          echo ""
+          echo "This test verifies that macOS binaries finalized on macOS have valid signatures."
+          echo ""
+
+          # Check both x86_64 and aarch64 macOS binaries
+          for binary in cross-platform-test/finalized-x86_64-macos cross-platform-test/finalized-aarch64-macos; do
+            echo "Checking $binary..."
+
+            if codesign --verify --verbose "$binary" 2>&1; then
+              echo "✓ $binary: Signature is valid"
+            else
+              echo "✗ ERROR: $binary: Signature verification failed!"
+              exit 1
+            fi
+
+            # Display signature info
+            echo "  Signature details:"
+            codesign -d -vv "$binary" 2>&1 | grep -E "(Signature|CodeDirectory|Identifier)" || true
+            echo ""
+          done
+
+          echo "========================================="
+          echo "✓ All macOS binaries have valid signatures!"
+          echo "========================================="
 
       - name: Upload cross-platform test results (macOS)
         uses: actions/upload-artifact@v4
