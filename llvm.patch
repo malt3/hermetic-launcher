@@ -1,0 +1,13 @@
+diff --git a/toolchain/args/BUILD.bazel b/toolchain/args/BUILD.bazel
+index 8f71d41..3319789 100644
+--- a/toolchain/args/BUILD.bazel
++++ b/toolchain/args/BUILD.bazel
+@@ -86,7 +86,7 @@ cc_args(
+         "@rules_cc//cc/toolchains/actions:lto_index_for_nodeps_dynamic_library",
+     ],
+     args = [
+-        "-static-pie",
++        #"-static-pie",
+     ],
+ )
+ 

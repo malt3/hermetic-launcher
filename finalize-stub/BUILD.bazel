@@ -1,0 +1,10 @@
+load("//:defs.bzl", "rust_release_binary")
+
+rust_release_binary(
+    name = "finalize-stub",
+    srcs = glob(["src/*.rs"]),
+    deps = [
+        "@crates//:apple-codesign",
+        "@crates//:clap",
+    ],
+)
