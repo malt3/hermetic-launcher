@@ -1,0 +1,16 @@
+load("//:defs.bzl", "rust_release_binary")
+
+rust_release_binary(
+    name = "finalize-stub",
+    srcs = glob(["src/*.rs"]),
+    #rustc_flags = select({
+    #    "@platforms//os:linux": [
+    #        "-Clink-arg=-static",
+    #    ],
+    #    "//conditions:default": [],
+    #}),
+    deps = [
+        "@crates//:apple-codesign",
+        "@crates//:clap",
+    ],
+)

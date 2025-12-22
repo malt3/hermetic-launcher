@@ -1,0 +1,16 @@
+load("//:defs.bzl", "rust_release_binary")
+
+rust_release_binary(
+    name = "runfiles-stub",
+    srcs = glob(["src/*.rs"]),
+    rustc_flags = ["-C", "panic=abort"] + select({
+        "@platforms//os:linux": [
+            "-Clink-arg=-nostartfiles",
+            "-Clink-arg=-static",
+            "-Clink-arg=-no-pie",
+            "-Crelocation-model=static",
+            "-Clink-self-contained=no",
+        ],
+        "//conditions:default": [],
+    }),
+)
